@@ -471,36 +471,58 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen text-white">
       {/* Header (glass) */}
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-black/20 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-3">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="Foto" className="h-20 w-20 sm:h-20 sm:w-20 rounded-full object-cover border border-white/20" />
-            ) : (
-              <div className="h-20 w-20 rounded-full bg-white/10 border border-white/15 grid place-items-center text-sm">🙂</div>
-            )}
+      {/* Header (glass) */}
+<header className="sticky top-0 z-20 border-b border-white/10 bg-black/20 backdrop-blur-md">
+  <div className="mx-auto max-w-5xl px-4 py-4">
+    <div className="relative flex items-center justify-between gap-3">
 
-            <img
-              src={madrugadoresLogo}
-              alt="Madrugadores"
-              className="h-20 w- sm:h-20 sm:w-20 rounded-xl border border-white/15 bg-white/10 p-1 object-contain"
-            />
+      {/* ESCUDO: izquierda absoluta (sin cuadrado) */}
+      <img
+        src={madrugadoresLogo}
+        alt="Madrugadores FC"
+        className="absolute left-0 top-1/2 -translate-y-1/2 h-14 w-14 sm:h-16 sm:w-16 object-contain"
+      />
 
-            <div>
-              <h1 className="text-xl font-extrabold tracking-tight">Bienvenido a la App Madrugadores FC</h1>
-              <p className="text-sm text-white/75">
-                Conectado como <span className="font-semibold text-white">{nombre}</span> ·{" "}
-                <span className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-xs font-bold">
-                  {rol}
-                </span>
-              </p>
-              {msg && <p className="mt-1 text-xs text-red-200">{msg}</p>}
-            </div>
-          </div>
-
-          <SoftButton onClick={salir}>Salir</SoftButton>
+      {/* CENTRO: título + conectado como */}
+      <div className="pl-16 sm:pl-20">
+        {/* Título en una sola línea, diferente al resto */}
+        <div className="inline-flex items-center rounded-2xl border border-white/15 bg-white/10 px-3 py-2">
+          <h1 className="text-base sm:text-lg font-extrabold tracking-tight leading-none whitespace-nowrap">
+            App Madrugadores FC
+          </h1>
         </div>
-      </header>
+
+        <p className="mt-2 text-sm text-white/75">
+          Conectado como <span className="font-semibold text-white">{nombre}</span> ·{" "}
+          <span className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-xs font-bold">
+            {rol}
+          </span>
+        </p>
+
+        {msg && <p className="mt-1 text-xs text-red-200">{msg}</p>}
+      </div>
+
+      {/* DERECHA: foto (cuadrado redondeado) + salir */}
+      <div className="flex items-center gap-3">
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt="Foto"
+            className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl object-cover border border-white/20"
+          />
+        ) : (
+          <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl bg-white/10 border border-white/15 grid place-items-center text-sm">
+            🙂
+          </div>
+        )}
+
+        <SoftButton onClick={salir}>Salir</SoftButton>
+      </div>
+
+    </div>
+  </div>
+</header>
+
 
       {/* ✅ Banner Superliga */}
       <div className="mx-auto max-w-5xl px-4 pt-4">
