@@ -50,7 +50,7 @@ export default function PageTransition() {
         <img
           src={logo2026}
           alt="Madrugadores 2026"
-          className="mx-auto h-20 w-auto sm:h-24 object-contain"
+          className="mx-auto h-40 w-auto sm:h-48 object-contain"
         />
         <div className="mt-3 text-center text-sm font-extrabold text-white/90 tracking-wide">
           Cargando...
