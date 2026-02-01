@@ -17,19 +17,35 @@ export default function AdminScan() {
     const safeMsg = (t) => mountedRef.current && setMsg(t);
 
     const findOpenTraining = async () => {
-      const nowIso = new Date().toISOString();
+  // hora Lima real
+  const now = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "America/Lima" })
+  );
 
-      const { data, error } = await supabase
-        .from("trainings")
-        .select("id, label, training_date, start_time, checkin_open_at, checkin_close_at")
-        .lte("checkin_open_at", nowIso)
-        .gt("checkin_close_at", nowIso) // close_at > now
-        .order("checkin_open_at", { ascending: false })
-        .limit(1);
+  const today = now.toISOString().slice(0, 10);
 
-      if (error) return { training: null, error };
-      return { training: data?.[0] ?? null, error: null };
-    };
+  // trae solo trainings de HOY (mucho más eficiente)
+  const { data, error } = await supabase
+    .from("trainings")
+    .select("*")
+    .eq("training_date", today);
+
+  if (error) return { training: null, error };
+
+  const openNow = (data || []).find((t) => {
+    const open = new Date(t.checkin_open_at);
+    const close = t.checkin_close_at
+      ? new Date(t.checkin_close_at)
+      : new Date(open.getTime() + 60 * 60 * 1000);
+
+    return now >= open && now < close;
+  });
+
+  return { training: openNow || null, error: null };
+};
+
+
+
 
     const start = async () => {
       try {

@@ -18,7 +18,7 @@ export default function SponsorCarousel({
     () => [
       { src: sponsor1, alt: "CR Consult", href: "https://crconsult.pe" },
       { src: sponsor2, alt: "Fundo Onírica", href: "https://www.instagram.com/fundo_onirica/?hl=es" },
-      { src: sponsor3, alt: "LinkedIn César Revolledo", href: "https://www.linkedin.com/in/cesar-williams-revolledo-quinto-a3a05943" },
+      { src: sponsor3, alt: "Terrones Whatsapp", href: "https://wa.me/51995696273?text=Hola%20Terrones,%20vengo%20de%20Madrugadores%20FC"},
     ],
     []
   );

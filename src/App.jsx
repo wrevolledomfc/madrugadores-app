@@ -14,7 +14,12 @@ import Profile from "./pages/Profile.jsx";
 import Ranking from "./pages/Ranking.jsx";
 import SubirFoto from "./pages/SubirFoto.jsx";
 import AsistenciasAnuales from "./pages/AsistenciasAnuales.jsx";
-import EstadoPagos from "./pages/EstadoPagos";
+import EstadoPagos from "./pages/EstadoPagos.jsx";
+
+import MisPagos from "./pages/MisPagos.jsx";
+import PagoMulta from "./pages/PagoMulta.jsx";
+import MisMultas from "./pages/MisMultas.jsx";
+
 export default function App() {
   return (
     <>
@@ -24,10 +29,10 @@ export default function App() {
         {/* raíz */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-        {/* ❌ login SIN AppLayout (tiene su propio fondo bus) */}
+        {/* login SIN AppLayout */}
         <Route path="/login" element={<Login />} />
 
-        {/* ✅ todo lo demás CON AppLayout */}
+        {/* todo lo demás CON AppLayout */}
         <Route element={<AppLayout />}>
           <Route
             path="/dashboard"
@@ -37,6 +42,7 @@ export default function App() {
               </RequireAuth>
             }
           />
+
           <Route
             path="/pago"
             element={
@@ -45,6 +51,43 @@ export default function App() {
               </RequireAuth>
             }
           />
+
+          <Route
+            path="/mis-pagos"
+            element={
+              <RequireAuth>
+                <MisPagos />
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/estado-pagos"
+            element={
+              <RequireAuth>
+                <EstadoPagos />
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/multa"
+            element={
+              <RequireAuth>
+                <PagoMulta />
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/mis-multas"
+            element={
+              <RequireAuth>
+                <MisMultas />
+              </RequireAuth>
+            }
+          />
+
           <Route
             path="/mi-qr"
             element={
@@ -53,6 +96,7 @@ export default function App() {
               </RequireAuth>
             }
           />
+
           <Route
             path="/mi-foto"
             element={
@@ -61,6 +105,7 @@ export default function App() {
               </RequireAuth>
             }
           />
+
           <Route
             path="/admin-scan"
             element={
@@ -69,6 +114,7 @@ export default function App() {
               </RequireAuth>
             }
           />
+
           <Route
             path="/profile"
             element={
@@ -77,6 +123,7 @@ export default function App() {
               </RequireAuth>
             }
           />
+
           <Route
             path="/ranking"
             element={
@@ -85,6 +132,7 @@ export default function App() {
               </RequireAuth>
             }
           />
+
           <Route
             path="/asistencias"
             element={
@@ -94,9 +142,7 @@ export default function App() {
             }
           />
 
-          <Route path="/estado-pagos" element={<EstadoPagos />} />
-
-          {/* fallback */}
+          {/* fallback SIEMPRE AL FINAL */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Routes>

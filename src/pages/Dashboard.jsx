@@ -10,16 +10,18 @@ import madrugadoresLogo from "../assets/madrugadores-logo.png";
 import superligaBanner from "../assets/superliga-banner-equipos.png";
 import SponsorCarousel from "../components/SponsorCarousel";
 
-// ✅ Link configurable (puedes cambiarlo en .env)
 const CLUB_URL = import.meta.env.VITE_CLUB_URL || "https://sites.google.com/view/mfc2026";
 
-const SHEETS_WEBAPP_URL = import.meta.env.VITE_PAGOS_WEBAPP_URL; // tu /exec
-const SHEET_URL = import.meta.env.VITE_PAGOS_SHEET_URL; // tu google sheet url
+// Sheets/Admin
+const SHEETS_WEBAPP_URL = import.meta.env.VITE_PAGOS_WEBAPP_URL; // /exec pagos
+const SHEET_URL = import.meta.env.VITE_PAGOS_SHEET_URL;
 const ASISTENCIAS_SHEET_URL = import.meta.env.VITE_ASISTENCIAS_SHEET_URL;
 
-// Bucket (Storage)
-const RECEIPTS_BUCKET = import.meta.env.VITE_RECEIPTS_BUCKET || "Recibos";
+// Multas (admin)
+const MULTAS_WEBAPP_URL = import.meta.env.VITE_MULTAS_WEBAPP_URL; // /exec multas
+const MULTAS_SHEET_URL = import.meta.env.VITE_MULTAS_SHEET_URL;
 
+// ===== Helpers =====
 function formatPE(d) {
   try {
     return d.toLocaleDateString("es-PE");
@@ -27,11 +29,48 @@ function formatPE(d) {
     return String(d);
   }
 }
+function timeHHMM(t) {
+  if (!t) return "";
+  return String(t).slice(0, 5);
+}
+function moneyPE(n) {
+  try {
+    return new Intl.NumberFormat("es-PE", {
+      style: "currency",
+      currency: "PEN",
+      maximumFractionDigits: 2,
+    }).format(n);
+  } catch {
+    return `S/ ${Number(n || 0).toFixed(2)}`;
+  }
+}
+function toNumberSafe(x) {
+  const n = Number(String(x ?? "").replace(",", "."));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function normalizeAdminVerification(v) {
+  const s = String(v || "").trim().toLowerCase();
+  if (s === "validado") return "Validado";
+  if (s === "observado") return "Observado";
+  if (s === "pendiente") return "Pendiente";
+  return "Pendiente";
+}
+
+function parseBestDate(row) {
+  const iso = row?.operation_datetime || row?.created_at;
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function peNow() {
+  return new Date();
+}
 
 function getWeekRange(now = new Date()) {
   const d = new Date(now);
   d.setHours(0, 0, 0, 0);
-
   const dow = d.getDay();
   const diffToMonday = (dow === 0 ? -6 : 1) - dow;
 
@@ -46,59 +85,46 @@ function getWeekRange(now = new Date()) {
   return { monday, sunday };
 }
 
-function timeHHMM(t) {
-  if (!t) return "";
-  return String(t).slice(0, 5);
+function isFridayNoonPassed(now = new Date()) {
+  const d = new Date(now);
+  const day = d.getDay(); // 0 dom .. 5 vie
+  if (day < 5) return false;
+  if (day > 5) return true;
+  const noon = new Date(d);
+  noon.setHours(12, 0, 0, 0);
+  return d.getTime() > noon.getTime();
 }
 
-function normalizeBankStatus(v) {
-  const s = String(v || "").trim().toLowerCase();
-  if (s === "confirmado" || s === "confirmada") return "Confirmado";
-  if (s === "rechazado" || s === "rechazada") return "Rechazado";
-  return "Pendiente";
+function startOfWeekMonday(d = new Date()) {
+  const x = new Date(d);
+  const day = x.getDay(); // 0=Dom, 1=Lun...
+  const diff = day === 0 ? -6 : 1 - day; // lunes como inicio
+  x.setDate(x.getDate() + diff);
+  x.setHours(0, 0, 0, 0);
+  return x;
 }
 
-function normalizeAdminVerification(v) {
-  const s = String(v || "").trim().toLowerCase();
-  if (s === "validado") return "Validado";
-  if (s === "observado") return "Observado";
-  if (s === "pendiente") return "Pendiente";
-  return "";
+function endOfWeekSunday(d = new Date()) {
+  const s = startOfWeekMonday(d);
+  const e = new Date(s);
+  e.setDate(e.getDate() + 6);
+  e.setHours(23, 59, 59, 999);
+  return e;
 }
 
-function effectiveStatus(row) {
-  // IMPORTANTE: aquí el estado final lo decide el Admin si existe admin_verification
-  const adminV = normalizeAdminVerification(row?.admin_verification);
-  if (adminV === "Validado") return "Confirmado";
-  if (adminV === "Observado") return "Rechazado";
-  return normalizeBankStatus(row?.bank_confirmation);
+function remainingOpportunitiesThisWeek(weekTrainings, now = new Date()) {
+  const end = endOfWeekSunday(now);
+  if (now > end) return 0; // semana terminada
+
+  return (weekTrainings || []).filter((t) => {
+    if (!t?.open_at) return false;
+    const dt = new Date(t.open_at);
+    if (Number.isNaN(dt.getTime())) return false;
+    return dt >= now; // aún no ocurre
+  }).length;
 }
 
-function toNumberSafe(x) {
-  const n = Number(String(x ?? "").replace(",", "."));
-  return Number.isFinite(n) ? n : 0;
-}
-
-function moneyPE(n) {
-  try {
-    return new Intl.NumberFormat("es-PE", {
-      style: "currency",
-      currency: "PEN",
-      maximumFractionDigits: 2,
-    }).format(n);
-  } catch {
-    return `S/ ${Number(n || 0).toFixed(2)}`;
-  }
-}
-
-function badgeForAdminVerification(v) {
-  const s = normalizeAdminVerification(v);
-  if (s === "Validado") return { text: "Validado", cls: "bg-emerald-500/15 border-emerald-300/30 text-emerald-50" };
-  if (s === "Observado") return { text: "Observado", cls: "bg-amber-500/15 border-amber-300/30 text-amber-50" };
-  return { text: "Pendiente", cls: "bg-white/10 border-white/15 text-white/80" };
-}
-
-/** UI helpers */
+// ===== UI =====
 function Card({ className, children }) {
   return (
     <div
@@ -111,7 +137,6 @@ function Card({ className, children }) {
     </div>
   );
 }
-
 function SoftButton({ className, ...props }) {
   return (
     <button
@@ -124,7 +149,6 @@ function SoftButton({ className, ...props }) {
     />
   );
 }
-
 function SoftLink({ className, ...props }) {
   return (
     <a
@@ -137,18 +161,27 @@ function SoftLink({ className, ...props }) {
   );
 }
 
-function Tile({ to, href, title, subtitle, tag, external = false }) {
+function BigAction({ to, href, external, title, subtitle, right }) {
   const inner = (
     <Card className="p-5 hover:bg-white/15 transition">
-      <div className="text-xs text-white/70">{tag}</div>
-      <div className="mt-1 text-lg font-extrabold text-white">{title}</div>
-      <div className="mt-2 text-sm text-white/75">{subtitle}</div>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-lg font-extrabold text-white">{title}</div>
+          <div className="mt-1 text-sm text-white/75">{subtitle}</div>
+        </div>
+        {right ? <div className="text-right text-xs text-white/80">{right}</div> : null}
+      </div>
     </Card>
   );
 
   if (href) {
     return (
-      <a href={href} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined} className="block">
+      <a
+        href={href}
+        target={external ? "_blank" : undefined}
+        rel={external ? "noreferrer" : undefined}
+        className="block"
+      >
         {inner}
       </a>
     );
@@ -160,59 +193,46 @@ function Tile({ to, href, title, subtitle, tag, external = false }) {
   );
 }
 
-/** === LÓGICA: AL DÍA / HABILITADO === */
-function dueCutoffForMonth(year, monthIndex0) {
-  // monthIndex0: 0=Ene ... 11=Dic
-  // Corte local: día 5 23:59:59
-  return new Date(year, monthIndex0, 5, 23, 59, 59, 999);
-}
-
-function monthsDueCount(now, year) {
-  // Cuenta cuántos "cortes" ya pasaron en el año
-  let count = 0;
-  for (let m = 0; m < 12; m++) {
-    const cutoff = dueCutoffForMonth(year, m);
-    if (now >= cutoff) count++;
-  }
-  return count;
-}
-
-function parseBestDate(row) {
-  // prioriza operation_datetime; si no, created_at
-  const iso = row?.operation_datetime || row?.created_at;
-  if (!iso) return null;
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
-  const [nombre, setNombre] = useState("");
-  const [rol, setRol] = useState(""); // "SOCIO" | "ADMIN"
-  const [msg, setMsg] = useState("");
 
+  const [nombre, setNombre] = useState("");
+  const [rol, setRol] = useState(""); // SOCIO | ADMIN
+  const [msg, setMsg] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
 
+  // Pagos (mensualidad)
+  const [payYear, setPayYear] = useState(2026);
+  const [sumRegistered, setSumRegistered] = useState(0);
+  const [sumValidated, setSumValidated] = useState(0);
+  const [sumObserved, setSumObserved] = useState(0);
+  const [lastValidatedPay, setLastValidatedPay] = useState(null);
+  const [rowsYearValidated, setRowsYearValidated] = useState([]);
+
+  // Asistencia semana
   const [weekText, setWeekText] = useState("");
-  const [weekTrainings, setWeekTrainings] = useState([]);
+  const [weekTrainings, setWeekTrainings] = useState([]); // [{id,label,training_date,start_time,open_at}]
   const [attendanceMap, setAttendanceMap] = useState(new Set());
   const [attendedThisWeek, setAttendedThisWeek] = useState(null);
 
-  const [payYear, setPayYear] = useState(2026);
-  const [sumConfirmed, setSumConfirmed] = useState(0);
-  const [sumPending, setSumPending] = useState(0);
-  const [sumRejected, setSumRejected] = useState(0);
+  // Multas
+  const [fineValidatedThisWeek, setFineValidatedThisWeek] = useState(false);
+  const [finePendingThisWeek, setFinePendingThisWeek] = useState(false);
 
-  // ✅ ahora guardamos el último pago VALIDADO (no cualquier último)
-  const [lastValidatedPay, setLastValidatedPay] = useState(null);
-
+  // Admin sync
   const [syncingPayments, setSyncingPayments] = useState(false);
   const [webappOk, setWebappOk] = useState(null);
 
-  const attendedCount = useMemo(() => attendanceMap.size, [attendanceMap]);
+  const [syncingFines, setSyncingFines] = useState(false);
+  const [webappFinesOk, setWebappFinesOk] = useState(null);
 
   const EXPECTED_WEEKLY = 4;
-  const totalThisWeek = useMemo(() => (weekTrainings.length > 0 ? weekTrainings.length : EXPECTED_WEEKLY), [weekTrainings]);
+
+  const attendedCount = useMemo(() => attendanceMap.size, [attendanceMap]);
+  const totalThisWeek = useMemo(
+    () => (weekTrainings.length > 0 ? weekTrainings.length : EXPECTED_WEEKLY),
+    [weekTrainings.length]
+  );
 
   const userIdRef = useRef(null);
 
@@ -221,15 +241,14 @@ export default function Dashboard() {
     window.location.href = "/login";
   };
 
+  // ===== LOADERS =====
   const loadSocioSums = async (userId) => {
     const year = 2026;
     setPayYear(year);
 
     const { data: pays, error: pErr } = await supabase
       .from("payments")
-      .select(
-        "id, amount, bank_confirmation, admin_verification, admin_observaciones, admin_confirmed_at, admin_confirmed_email, receipt_path, archivo_path, operation_datetime, created_at"
-      )
+      .select("id, amount, admin_verification, admin_observaciones, receipt_path, operation_datetime, created_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
 
@@ -239,39 +258,37 @@ export default function Dashboard() {
     }
 
     const rowsAll = pays || [];
-    const rows = rowsAll.filter((r) => {
+    const rowsYear = rowsAll.filter((r) => {
       const iso = r.operation_datetime || r.created_at;
       if (!iso) return false;
       return String(iso).slice(0, 4) === String(year);
     });
 
-    let c = 0,
-      pe = 0,
-      rr = 0;
+    let reg = 0,
+      val = 0,
+      obs = 0;
 
-    rows.forEach((row) => {
-      const status = effectiveStatus(row);
+    rowsYear.forEach((row) => {
       const amt = toNumberSafe(row.amount);
-      if (status === "Confirmado") c += amt;
-      else if (status === "Rechazado") rr += amt;
-      else pe += amt;
+      reg += amt;
+
+      const adminSt = normalizeAdminVerification(row.admin_verification);
+      if (adminSt === "Validado") val += amt;
+      else if (adminSt === "Observado") obs += amt;
     });
 
-    setSumConfirmed(c);
-    setSumPending(pe);
-    setSumRejected(rr);
+    setSumRegistered(reg);
+    setSumValidated(val);
+    setSumObserved(obs);
 
-    // ✅ último pago VALIDADO por admin
-    const validated = rows
-      .filter((x) => normalizeAdminVerification(x.admin_verification) === "Validado")
+    const validatedRowsYear = rowsYear.filter((x) => normalizeAdminVerification(x.admin_verification) === "Validado");
+    setRowsYearValidated(validatedRowsYear);
+
+    const validatedSorted = validatedRowsYear
       .slice()
-      .sort((a, b) => {
-        const da = parseBestDate(a);
-        const db = parseBestDate(b);
-        return (db?.getTime() || 0) - (da?.getTime() || 0);
-      });
+      .sort((a, b) => (parseBestDate(b)?.getTime() || 0) - (parseBestDate(a)?.getTime() || 0));
 
-    setLastValidatedPay(validated[0] || null);
+    setLastValidatedPay(validatedSorted[0] || null);
   };
 
   const loadSocioWeek = async (userId) => {
@@ -283,7 +300,7 @@ export default function Dashboard() {
 
     const { data: trainings, error: tErr } = await supabase
       .from("trainings")
-      .select("id, label, checkin_open_at, checkin_close_at")
+      .select("id, label, checkin_open_at")
       .gte("checkin_open_at", startIso)
       .lte("checkin_open_at", endIso)
       .order("checkin_open_at", { ascending: true });
@@ -296,6 +313,7 @@ export default function Dashboard() {
       setWeekTrainings(
         list.map((t) => ({
           id: t.id,
+          open_at: t.checkin_open_at || null, // guardamos ISO real
           training_date: String(t.checkin_open_at).slice(0, 10),
           start_time: String(t.checkin_open_at).slice(11, 16),
           label: t.label || "Entrenamiento",
@@ -323,6 +341,35 @@ export default function Dashboard() {
     setAttendanceMap(attendedTrainingIds);
   };
 
+  const loadSocioFinesThisWeek = async (userId) => {
+    const { monday, sunday } = getWeekRange(new Date());
+    const startIso = `${monday.toISOString().slice(0, 10)}T00:00:00-05:00`;
+    const endIso = `${sunday.toISOString().slice(0, 10)}T23:59:59-05:00`;
+
+    const { data, error } = await supabase
+      .from("training_fines")
+      .select("id, admin_verification, created_at, operation_datetime")
+      .eq("user_id", userId)
+      .gte("created_at", startIso)
+      .lte("created_at", endIso)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      setMsg((m) => (m ? m + " | " : "") + "No pude cargar tus multas: " + error.message);
+      setFineValidatedThisWeek(false);
+      setFinePendingThisWeek(false);
+      return;
+    }
+
+    const rows = data || [];
+    const hasValidated = rows.some((r) => normalizeAdminVerification(r.admin_verification) === "Validado");
+    const hasPending = rows.some((r) => normalizeAdminVerification(r.admin_verification) === "Pendiente");
+
+    setFineValidatedThisWeek(hasValidated);
+    setFinePendingThisWeek(hasPending);
+  };
+
+  // ===== ADMIN SYNC (PAGOS) =====
   const syncValidatedPaymentsToSupabase = async () => {
     try {
       setMsg("");
@@ -349,6 +396,7 @@ export default function Dashboard() {
         if (!paymentId) continue;
 
         const { data: exists, error: exErr } = await supabase.from("payments").select("id").eq("id", paymentId).maybeSingle();
+
         if (exErr) {
           failCount++;
           continue;
@@ -358,20 +406,18 @@ export default function Dashboard() {
           continue;
         }
 
-        const bank_confirmation = String(item.bank_confirmation || "").trim();
-        const admin_observaciones =
-          item.admin_observacion === null || item.admin_observacion === undefined ? null : String(item.admin_observacion);
-        const amount = item.amount === null || item.amount === undefined ? null : Number(item.amount);
+        const admin_verification = String(item.admin_verification || "Pendiente").trim();
+        const admin_observaciones = item.admin_observaciones == null ? null : String(item.admin_observaciones);
 
-        const payload = { bank_confirmation, admin_observaciones };
-        if (Number.isFinite(amount)) payload.amount = amount;
+        const payload = { admin_verification, admin_observaciones };
 
         const { error } = await supabase.from("payments").update(payload).eq("id", paymentId);
         if (error) failCount++;
         else okCount++;
       }
 
-      setMsg(`✅ Sync listo. Actualizados: ${okCount}. No existían: ${missingCount}. Fallaron: ${failCount}.`);
+      setMsg(`✅ Sync pagos listo. Actualizados: ${okCount}. No existían: ${missingCount}. Fallaron: ${failCount}.`);
+      if (userIdRef.current) await loadSocioSums(userIdRef.current);
     } catch (e) {
       setWebappOk(false);
       setMsg(`Error en Sync Pagos: ${e?.message || String(e)}`);
@@ -380,8 +426,71 @@ export default function Dashboard() {
     }
   };
 
+  // ===== ADMIN SYNC (MULTAS) =====
+  const syncValidatedFinesToSupabase = async () => {
+    try {
+      setMsg("");
+      setSyncingFines(true);
+      setWebappFinesOk(null);
+
+      if (!MULTAS_WEBAPP_URL) throw new Error("Falta VITE_MULTAS_WEBAPP_URL en tu .env");
+
+      const list = await jsonp(MULTAS_WEBAPP_URL + "?action=validated&callback=cb");
+      setWebappFinesOk(true);
+
+      if (!Array.isArray(list)) throw new Error("Respuesta inválida del WebApp (no es array).");
+      if (list.length === 0) {
+        setMsg("No hay multas por sincronizar.");
+        return;
+      }
+
+      let okCount = 0,
+        failCount = 0,
+        missingCount = 0;
+
+      for (const item of list) {
+        const fineId = String(item.fine_id || "").trim();
+        if (!fineId) continue;
+
+        const { data: exists, error: exErr } = await supabase
+          .from("training_fines")
+          .select("id")
+          .eq("id", fineId)
+          .maybeSingle();
+
+        if (exErr) {
+          failCount++;
+          continue;
+        }
+        if (!exists) {
+          missingCount++;
+          continue;
+        }
+
+        const admin_verification = String(item.admin_verification || "Pendiente").trim();
+        const admin_observaciones = item.admin_observaciones == null ? null : String(item.admin_observaciones);
+
+        const payload = { admin_verification, admin_observaciones };
+
+        const { error } = await supabase.from("training_fines").update(payload).eq("id", fineId);
+        if (error) failCount++;
+        else okCount++;
+      }
+
+      setMsg(`✅ Sync multas listo. Actualizados: ${okCount}. No existían: ${missingCount}. Fallaron: ${failCount}.`);
+      if (userIdRef.current) await loadSocioFinesThisWeek(userIdRef.current);
+    } catch (e) {
+      setWebappFinesOk(false);
+      setMsg(`Error en Sync Multas: ${e?.message || String(e)}`);
+    } finally {
+      setSyncingFines(false);
+    }
+  };
+
+  // ===== INIT =====
   useEffect(() => {
-    let channel = null;
+    let channelPays = null;
+    let channelFines = null;
 
     const cargar = async () => {
       setMsg("");
@@ -389,12 +498,10 @@ export default function Dashboard() {
 
       const { data: authData, error: authError } = await supabase.auth.getUser();
       const user = authData?.user;
-
       if (authError || !user) {
         window.location.href = "/login";
         return;
       }
-
       userIdRef.current = user.id;
 
       const { data: profile, error: profileError } = await supabase
@@ -406,19 +513,8 @@ export default function Dashboard() {
       if (profileError) setMsg((m) => (m ? m + " | " : "") + "Perfil: " + profileError.message);
 
       setNombre(profile?.full_name?.trim() || user.email || "Usuario");
-
-      // ✅ FIX anti-crash
-      const roleValue = profile?.role;
-      const roleText =
-        typeof roleValue === "string"
-          ? roleValue
-          : roleValue == null
-          ? ""
-          : Array.isArray(roleValue)
-          ? String(roleValue[0] ?? "")
-          : String(roleValue);
-
-      const rolFinal = roleText.trim().toLowerCase() === "admin" ? "ADMIN" : "SOCIO";
+      const roleText = String(profile?.role || "").trim().toLowerCase();
+      const rolFinal = roleText === "admin" ? "ADMIN" : "SOCIO";
       setRol(rolFinal);
 
       if (profile?.avatar_url) {
@@ -429,12 +525,19 @@ export default function Dashboard() {
       if (rolFinal === "SOCIO") {
         await loadSocioSums(user.id);
         await loadSocioWeek(user.id);
+        await loadSocioFinesThisWeek(user.id);
 
-        // ✅ realtime
-        channel = supabase
+        channelPays = supabase
           .channel(`payments_socio_${user.id}`)
           .on("postgres_changes", { event: "*", schema: "public", table: "payments", filter: `user_id=eq.${user.id}` }, async () => {
             await loadSocioSums(user.id);
+          })
+          .subscribe();
+
+        channelFines = supabase
+          .channel(`fines_socio_${user.id}`)
+          .on("postgres_changes", { event: "*", schema: "public", table: "training_fines", filter: `user_id=eq.${user.id}` }, async () => {
+            await loadSocioFinesThisWeek(user.id);
           })
           .subscribe();
       }
@@ -443,126 +546,471 @@ export default function Dashboard() {
     };
 
     cargar();
-
     return () => {
-      if (channel) supabase.removeChannel(channel);
+      if (channelPays) supabase.removeChannel(channelPays);
+      if (channelFines) supabase.removeChannel(channelFines);
     };
   }, []);
 
+  // ===== REGLAS (PAGOS) =====
+  const now = peNow();
+  const xMonth = now.getMonth() + 1;
+
+  const c5 = useMemo(() => new Date(payYear, xMonth - 1, 5, 23, 59, 59, 999), [payYear, xMonth]);
+  const c10 = useMemo(() => new Date(payYear, xMonth - 1, 10, 23, 59, 59, 999), [payYear, xMonth]);
+
+  const cEOM = useMemo(() => new Date(payYear, xMonth, 0, 23, 59, 59, 999), [payYear, xMonth]);
+
+  const w6to10Start = useMemo(() => new Date(payYear, xMonth - 1, 6, 0, 0, 0, 0), [payYear, xMonth]);
+  const w6to10End = useMemo(() => new Date(payYear, xMonth - 1, 10, 23, 59, 59, 999), [payYear, xMonth]);
+  const w11toEomStart = useMemo(() => new Date(payYear, xMonth - 1, 11, 0, 0, 0, 0), [payYear, xMonth]);
+
+  const requiredDue = useMemo(() => {
+    const base = now.getTime() <= c5.getTime() ? xMonth - 1 : xMonth;
+    return Math.max(0, base) * 100;
+  }, [now, c5, xMonth]);
+
+  const isAlDia = useMemo(() => {
+    return rol === "SOCIO" ? sumValidated >= requiredDue : null;
+  }, [rol, sumValidated, requiredDue]);
+
+  const monthWindows = useMemo(() => {
+    if (rol !== "SOCIO") {
+      return { paidOnOrBefore5: 0, paid6to10: 0, paid11toEom: 0, lastValidatedDate: null };
+    }
+
+    const vrows = rowsYearValidated || [];
+
+    let paidOnOrBefore5 = 0;
+    let paid6to10 = 0;
+    let paid11toEom = 0;
+
+    let last = null;
+
+    for (const r of vrows) {
+      const amt = toNumberSafe(r.amount);
+
+      const dReg = r?.created_at ? new Date(r.created_at) : null;
+      if (dReg && !Number.isNaN(dReg.getTime())) {
+        const regMonth = dReg.getMonth() + 1;
+        const regYear = dReg.getFullYear();
+
+        if (regYear === payYear && regMonth === xMonth) {
+          if (dReg.getTime() <= c5.getTime()) paidOnOrBefore5 += amt;
+          else if (dReg.getTime() >= w6to10Start.getTime() && dReg.getTime() <= w6to10End.getTime()) paid6to10 += amt;
+          else if (dReg.getTime() >= w11toEomStart.getTime() && dReg.getTime() <= cEOM.getTime()) paid11toEom += amt;
+        }
+      }
+
+      const best = parseBestDate(r);
+      if (best && (!last || best.getTime() > last.getTime())) last = best;
+    }
+
+    return { paidOnOrBefore5, paid6to10, paid11toEom, lastValidatedDate: last };
+  }, [rol, rowsYearValidated, payYear, xMonth, c5, w6to10Start, w6to10End, w11toEomStart, cEOM]);
+
+  const lastValidatedDate = monthWindows.lastValidatedDate;
+
+  const paymentDecision = useMemo(() => {
+    if (rol !== "SOCIO") return { ok: true, title: "", text: "" };
+
+    if (!isAlDia) {
+      return {
+        ok: false,
+        title: "⛔ No habilitado por pago",
+        text: "No estás al día en tus cuotas mensuales (o todavía no han sido verificados todos tus pagos por el administrador).",
+      };
+    }
+
+    if (now.getTime() <= c5.getTime()) {
+      return {
+        ok: true,
+        title: "✅ Habilitado por pago",
+        text: `Estás al día bajo la regla previa al 05. Recuerda: el ${formatPE(c5)} vence el pago del mes.`,
+      };
+    }
+
+    if (monthWindows.paidOnOrBefore5 >= 100) {
+      return {
+        ok: true,
+        title: "✅ Habilitado por pago",
+        text: "Al día y con registro dentro del plazo (hasta el 05). Puedes jugar.",
+      };
+    }
+
+    if (monthWindows.paid6to10 >= 100) {
+      return {
+        ok: false,
+        title: "⚠️ Al día, pero con restricción",
+        text: `Estás al día, pero no puedes jugar la fecha siguiente al 05/${String(xMonth).padStart(2, "0")}/${payYear}, por haber registrado tu pago después del 05.`,
+      };
+    }
+
+    if (monthWindows.paid11toEom >= 100) {
+      return {
+        ok: false,
+        title: "⛔ Al día, pero sin jugar este mes",
+        text: `Estás al día, pero no puedes jugar durante todo el mes ${String(xMonth).padStart(2, "0")}/${payYear}, por haber pagado luego del 10.`,
+      };
+    }
+
+    return {
+      ok: false,
+      title: "⛔ No habilitado por pago",
+      text: "No estás al día en tus cuotas mensuales (o todavía no han sido verificados todos tus pagos por el administrador).",
+    };
+  }, [rol, isAlDia, now, c5, monthWindows, xMonth, payYear]);
+
+  const isHabilitadoPago = useMemo(() => {
+    if (rol !== "SOCIO") return true;
+    return paymentDecision.ok;
+  }, [rol, paymentDecision.ok]);
+
+  const paymentRuleText = useMemo(() => {
+    if (rol !== "SOCIO") return "";
+    return `${paymentDecision.title}\n${paymentDecision.text}`;
+  }, [rol, paymentDecision]);
+
+  // ===== ASISTENCIA SEMANAL (TEXTO CORRECTO) =====
+  const attendedWeekText = useMemo(() => {
+    if (rol !== "SOCIO") return "";
+    if (attendedCount <= 0) return "Aún no has asistido a entrenamientos esta semana.";
+    if (attendedCount === 1) return "Has asistido a 1 entrenamiento esta semana.";
+    return `Has asistido a ${attendedCount} entrenamientos esta semana.`;
+  }, [rol, attendedCount]);
+
+  const remainingOpp = useMemo(() => {
+    return rol === "SOCIO" ? remainingOpportunitiesThisWeek(weekTrainings, new Date()) : 0;
+  }, [rol, weekTrainings]);
+
+  const opportunitiesText = useMemo(() => {
+    if (rol !== "SOCIO") return "";
+    if (weekTrainings.length === 0) return "Aún no hay entrenamientos cargados esta semana.";
+    if (remainingOpp === 0) return "Ya no quedan oportunidades para entrenar esta semana.";
+    return `Te quedan ${remainingOpp} oportunidad${remainingOpp === 1 ? "" : "es"} para entrenar esta semana.`;
+  }, [rol, weekTrainings.length, remainingOpp]);
+
+  // ===== ENTRENAMIENTO =====
+  const needsFine = useMemo(() => (rol === "SOCIO" ? attendedCount < EXPECTED_WEEKLY : false), [rol, attendedCount]);
+  const fridayNoonPassed = useMemo(() => isFridayNoonPassed(now), [now]);
+
+  const habilitadoEntreno = useMemo(() => {
+    if (rol !== "SOCIO") return null;
+    if (!needsFine) return true;
+    if (fineValidatedThisWeek) return true;
+    return false;
+  }, [rol, needsFine, fineValidatedThisWeek]);
+
+  const entrenoRuleText = useMemo(() => {
+    if (rol !== "SOCIO") return "";
+    if (!needsFine) return "✅ Habilitado por entrenamiento (cumpliste entrenamientos).";
+
+    if (fineValidatedThisWeek) {
+      return "✅ Multa validada: habilitado por entrenamiento esta semana.";
+    }
+
+    if (!fridayNoonPassed) {
+      return "⛔ Te falta entrenamiento esta semana. Debes pagar la multa (S/100) hasta el viernes 12:00:00 (mediodía).";
+    }
+
+    return "⛔ No habilitado por entrenamiento: multa no pagada/validada dentro del plazo (viernes 12:00).";
+  }, [rol, needsFine, fineValidatedThisWeek, fridayNoonPassed]);
+
   if (loading) return <LoadingScreen text="Cargando..." />;
-
-  // ====== AL DÍA / HABILITADO (solo SOCIO) ======
-  const now = new Date();
-  const dueCount = monthsDueCount(now, payYear);
-  const expectedTotal = dueCount * 100;
-
-  const isAlDia = rol === "SOCIO" ? sumConfirmed >= expectedTotal : null;
-
-  // Corte del mes actual
-  const currentMonthCutoff = dueCutoffForMonth(payYear, now.getMonth());
-  const lastValidatedDate = parseBestDate(lastValidatedPay);
-
-  // regla exacta: habilitado solo si AL DÍA y último pago validado fue ANTES/IGUAL al corte del mes (día 5 23:59:59)
-  const isHabilitado = rol === "SOCIO" ? isAlDia && lastValidatedDate && lastValidatedDate <= currentMonthCutoff : null;
-
-  // ====== UI ======
-  const lastAdminBadge = badgeForAdminVerification(lastValidatedPay?.admin_verification);
 
   return (
     <div className="min-h-screen text-white">
-      {/* Header (glass) */}
-      {/* Header (glass) */}
-<header className="sticky top-0 z-20 border-b border-white/10 bg-black/20 backdrop-blur-md">
-  <div className="mx-auto max-w-5xl px-4 py-4">
-    <div className="relative flex items-center justify-between gap-3">
+      {/* HEADER */}
+      <header className="sticky top-0 z-20 border-b border-white/10 bg-black/30 backdrop-blur-md">
+        <div className="mx-auto max-w-5xl px-4 py-4">
+          <div className="flex items-center justify-between gap-3">
+            {/* IZQUIERDA */}
+            <div className="flex items-center gap-4 min-w-0">
+              <a
+                href="https://www.facebook.com/Madrugadoresfcoficial/"
+                target="_blank"
+                rel="noreferrer"
+                className="shrink-0"
+                title="Facebook Madrugadores FC"
+              >
+                <img
+                  src={madrugadoresLogo}
+                  alt="Madrugadores FC"
+                  className="h-16 w-16 sm:h-20 sm:w-20 object-contain"
+                />
+              </a>
 
-      {/* ESCUDO: izquierda absoluta (sin cuadrado) */}
-      <img
-        src={madrugadoresLogo}
-        alt="Madrugadores FC"
-        className="absolute left-0 top-1/2 -translate-y-1/2 h-14 w-14 sm:h-16 sm:w-16 object-contain"
-      />
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-2xl font-extrabold tracking-tight leading-none">MFC Online</h1>
 
-      {/* CENTRO: título + conectado como */}
-      <div className="pl-16 sm:pl-20">
-        {/* Título en una sola línea, diferente al resto */}
-        <div className="inline-flex items-center rounded-2xl border border-white/15 bg-white/10 px-3 py-2">
-          <h1 className="text-base sm:text-lg font-extrabold tracking-tight leading-none whitespace-nowrap">
-            MFC ONline
-          </h1>
+                <p className="mt-2 text-sm sm:text-base text-white/70 truncate">
+                  Conectado como <span className="font-semibold text-white">{nombre}</span> ·{" "}
+                  <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm font-bold">
+                    {rol}
+                  </span>
+                </p>
+
+                {msg && <p className="mt-1 text-sm text-red-200">{msg}</p>}
+              </div>
+            </div>
+
+            {/* DERECHA */}
+            <div className="flex items-center gap-3 shrink-0">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt="Foto"
+                  className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl object-cover border border-white/20"
+                />
+              ) : (
+                <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-white/10 border border-white/15 grid place-items-center text-base">
+                  🙂
+                </div>
+              )}
+
+              <SoftButton onClick={salir} className="px-5 py-3 text-base sm:text-lg">
+                Salir
+              </SoftButton>
+            </div>
+          </div>
         </div>
+      </header>
 
-        <p className="mt-2 text-sm text-white/75">
-          Conectado como <span className="font-semibold text-white">{nombre}</span> ·{" "}
-          <span className="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-xs font-bold">
-            {rol}
-          </span>
-        </p>
-
-        {msg && <p className="mt-1 text-xs text-red-200">{msg}</p>}
+      {/* Banner */}
+      <div className="mx-auto max-w-5xl px-4 pt-4">
+        <div className="overflow-hidden rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md shadow-[0_12px_35px_rgba(0,0,0,0.25)]">
+          <a href={CLUB_URL} target="_blank" rel="noreferrer" className="block" title="Ver datos del campeonato">
+            <img
+              src={superligaBanner}
+              alt="Superliga Argentina 2026"
+              className="w-full object-cover transition hover:scale-[1.01]"
+            />
+          </a>
+        </div>
       </div>
 
-      {/* DERECHA: foto (cuadrado redondeado) + salir */}
-      <div className="flex items-center gap-3">
-        {avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt="Foto"
-            className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl object-cover border border-white/20"
+      {/* Carrusel */}
+      <div className="mx-auto max-w-5xl px-4 pt-3">
+        <div className="mx-auto w-full max-w-5xl">
+          <SponsorCarousel
+            showTitle={false}
+            slidePaddingClassName="py-2 px-4"
+            imageClassName="max-h-20 sm:max-h-24 md:max-h-24 object-contain"
           />
-        ) : (
-          <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl bg-white/10 border border-white/15 grid place-items-center text-sm">
-            🙂
+        </div>
+      </div>
+
+      <main className="mx-auto max-w-5xl px-4 py-6 space-y-4">
+
+        {/* ===== FILA 3: QR y FOTO ===== */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <BigAction to="/mi-qr" title="Mi Carnet / QR" subtitle="Muestra tu QR al administrador o negocio." />
+          <BigAction to="/mi-foto" title="Mi Foto" subtitle="Sube tu foto (máx 1MB)." />
+        </div>
+        
+        {/* ===== FILA 1: PAGO DEL MES ===== */}
+        {rol === "SOCIO" && (
+          <div className="grid gap-4 sm:grid-cols-1">
+            <BigAction
+              to="/mis-pagos"
+              title="Registrar tu pago del mes (Mensualidad)"
+              subtitle="Sube tu voucher y revisa tu historial de pagos"
+              right={
+                <>
+                  <div>
+                    Total registrado: <b>{moneyPE(sumRegistered)}</b>
+                  </div>
+                  <div>
+                    Total validado: <b>{moneyPE(sumValidated)}</b>
+                  </div>
+                  <div>
+                    Total observado: <b>{moneyPE(sumObserved)}</b>
+                  </div>
+                </>
+              }
+            />
           </div>
         )}
 
-        <SoftButton onClick={salir}>Salir</SoftButton>
-      </div>
+        {/* ===== ESTADO DE PAGOS ===== */}
+        {rol === "SOCIO" && (
+          <Card className="p-5">
+            <div className="text-sm font-extrabold">Estado de Pagos</div>
 
-    </div>
-  </div>
-</header>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Card className="p-4">
+                <div className="text-sm font-extrabold">¿Estás al día en tus pagos?</div>
+                <div className="mt-1 text-xs text-white/70">
+                  Al {now.toISOString().slice(0, 10)} debes tener{" "}
+                  <span className="font-bold text-white">{moneyPE(requiredDue)}</span> en pagos <b>validados</b>.
+                </div>
 
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <div className="text-sm">
+                    Validados: <span className="font-extrabold">{moneyPE(sumValidated)}</span>
+                  </div>
 
-      {/* ✅ Banner Superliga */}
-      <div className="mx-auto max-w-5xl px-4 pt-4">
-        <div className="overflow-hidden rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md shadow-[0_12px_35px_rgba(0,0,0,0.25)]">
-          <img src={superligaBanner} alt="Superliga" className="w-full max-h-[170px] sm:max-h-[210px] md:max-h-[240px] object-cover" />
+                  <div
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs font-extrabold",
+                      isAlDia ? "bg-emerald-500/15 border-emerald-300/30 text-emerald-50" : "bg-red-500/15 border-red-300/30 text-red-100"
+                    )}
+                  >
+                    {isAlDia ? "✅ SÍ" : "⛔ NO"}
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-4">
+                <div className="text-sm font-extrabold">¿Habilitado por pago para jugar?</div>
+
+                <div className="mt-2 text-xs text-white/70">
+                  Regla: hasta el <b>05 (23:59:59)</b> se exige estar al día con <b>100 × (mes-1)</b>. Desde el{" "}
+                  <b>06 (00:00:00)</b> se exige <b>100 × mes</b>. Si pagas después del 05: del <b>06 al 10</b> no juegas la fecha siguiente; desde el{" "}
+                  <b>11</b> no juegas todo el mes.
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  <div className="text-xs text-white/70">
+                    Corte 05: <span className="font-semibold text-white">{formatPE(c5)}</span>
+                  </div>
+                  <div className="text-xs text-white/70">
+                    Corte 10: <span className="font-semibold text-white">{formatPE(c10)}</span>
+                  </div>
+
+                  <div className="text-xs text-white/70">
+                    Último pago validado: <span className="font-semibold text-white">{lastValidatedDate ? formatPE(lastValidatedDate) : "—"}</span>
+                  </div>
+
+                  <div
+                    className={cn(
+                      "rounded-xl border px-3 py-2 text-xs font-semibold whitespace-pre-line",
+                      isHabilitadoPago ? "bg-emerald-500/15 border-emerald-300/30 text-emerald-50" : "bg-red-500/15 border-red-300/30 text-red-100"
+                    )}
+                  >
+                    {paymentRuleText}
+                  </div>
+                </div>
+              </Card>
+            </div>
+          </Card>
+        )}
+
+        {/* ===== FILA 2: DATOS DEL TORNEO ===== */}
+        <div className="grid gap-4 sm:grid-cols-1">
+          <BigAction href={CLUB_URL} external title="Datos del Torneo" subtitle="Tabla, posiciones, fixtures y estado del campeonato." />
         </div>
-      </div>
 
-      {/* Carrusel patrocinadores (angosto, mitad del banner) */}
-<div className="mx-auto max-w-5xl px-4 pt-3">
-  <div className="mx-auto w-full max-w-5xl">
-    <SponsorCarousel
-      showTitle={false}
-      slidePaddingClassName="py-3 px-6"
-      imageClassName="max-h-20 sm:max-h-24 md:max-h-28 object-contain"
-    />
-  </div>
-</div>
+        
 
+        {/* ===== ASISTENCIA SEMANAL ===== */}
+        {rol === "SOCIO" && weekText && (
+          <Card className="p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-extrabold">Asistencia semanal</div>
+                <div className="mt-1 text-sm text-white/75">{weekText}</div>
 
-      <main className="mx-auto max-w-5xl px-4 py-6">
-        {/* Tiles */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Tile to="/pago" tag="Pagos" title="Registrar tu pago" subtitle="Sube tu recibo y deja constancia." />
-          <Tile href={CLUB_URL} external tag="Club" title="Ver Datos del Campeonato" subtitle="Mira la tabla y el estado." />
-          <Tile to="/mi-qr" tag="Asistencia" title="Mi Carnet/QR" subtitle="Muestra tu Carnet/QR al administrador/Negocio con Conveio." />
-          <Tile to="/mi-foto" tag="Perfil" title="Mi foto" subtitle="Sube tu foto (máx 1MB)." />
-          {rol === "ADMIN" && <Tile to="/admin-scan" tag="Admin" title="Escanear QR" subtitle="Registra ingresos escaneando el QR." />}
-        </div>
+                <div className="mt-2 text-xs text-white/80">
+                  <div>{attendedWeekText}</div>
+                  <div>{opportunitiesText}</div>
+                </div>
+              </div>
 
-        {/* Main Card */}
-        <Card className="mt-6 p-5">
-          <div className="text-xs text-white/70">Estado de Pagos</div>
-          <div className="mt-1 text-base font-semibold">
-            Hola, {nombre}. Acceso de {rol === "ADMIN" ? "administrador" : "socio"}.
-          </div>
+              <Link
+                to="/asistencias"
+                className="inline-flex items-center rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-extrabold hover:bg-white/15 transition text-white"
+              >
+                Ver entrenamientos del año
+              </Link>
+            </div>
 
-          {/* ADMIN */}
-          {rol === "ADMIN" && (
-            <div className="mt-4 flex flex-wrap gap-2 items-center">
+            <div className="mt-3 divide-y divide-white/10">
+              {weekTrainings.map((t) => {
+                const ok = attendanceMap.has(t.id);
+                return (
+                  <div key={t.id} className="flex items-center justify-between py-3 gap-3">
+                    <div>
+                      <div className="text-sm font-semibold">
+                        {t.label} ·{" "}
+                        <span className="text-white/70">
+                          {t.training_date} {timeHHMM(t.start_time)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div
+                      className={cn(
+                        "rounded-full border px-3 py-1 text-xs font-extrabold",
+                        ok ? "bg-emerald-500/15 border-emerald-300/30 text-emerald-50" : "bg-white/10 border-white/15 text-white/80"
+                      )}
+                    >
+                      {ok ? "✅ Asistió" : "⛔ No asistió"}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {weekTrainings.length === 0 && (
+                <div className="py-3 text-sm text-white/70">Aún no hay entrenamientos cargados esta semana.</div>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {/* ===== MULTA POR FALTA DE ENTRENAMIENTO ===== */}
+        {rol === "SOCIO" && (
+          <Card className="p-5">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <div className="text-sm font-extrabold">Habilitado por entrenamiento</div>
+                <div className="mt-1 text-xs text-white/70">
+                  Asistencias esta semana: <b>{attendedCount}</b> / <b>{totalThisWeek}</b>. Si te falta, multa S/100 hasta viernes 12:00:00.
+                </div>
+              </div>
+
+              <div
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-extrabold",
+                  habilitadoEntreno ? "bg-emerald-500/15 border-emerald-300/30 text-emerald-50" : "bg-red-500/15 border-red-300/30 text-red-100"
+                )}
+              >
+                {habilitadoEntreno ? "✅ SÍ" : "⛔ NO"}
+              </div>
+            </div>
+
+            <div
+              className={cn(
+                "mt-3 rounded-xl border px-3 py-2 text-xs font-semibold",
+                habilitadoEntreno ? "bg-emerald-500/10 border-emerald-300/20 text-emerald-50" : "bg-red-500/10 border-red-300/20 text-red-100"
+              )}
+            >
+              {entrenoRuleText}
+            </div>
+
+            {habilitadoEntreno === false && (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <BigAction
+                  to="/multa"
+                  title="Sube tu pago de multa por falta de entrenamiento"
+                  subtitle="Monto fijo S/100. Plazo: viernes 12:00:00."
+                  right={finePendingThisWeek ? "Tienes una multa pendiente esta semana" : ""}
+                />
+                <BigAction
+                  to="/mis-multas"
+                  title="Ver pagos de multas por no entrenar"
+                  subtitle="Historial y estado (pendiente/validado/observado)."
+                />
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* ===== ADMIN ===== */}
+        {rol === "ADMIN" && (
+          <Card className="p-5">
+            <div className="text-sm font-extrabold">Panel Admin</div>
+            <div className="mt-3 flex flex-wrap gap-2 items-center">
               <SoftLink href={SHEET_URL} target="_blank" rel="noreferrer">
                 Abrir Validación de Pagos (Sheet)
               </SoftLink>
@@ -572,196 +1020,27 @@ export default function Dashboard() {
               <SoftButton onClick={syncValidatedPaymentsToSupabase} disabled={syncingPayments}>
                 {syncingPayments ? "Sincronizando..." : "Sync pagos validados → Supabase"}
               </SoftButton>
-              <span className="text-xs text-white/70">WebApp: {webappOk === null ? "—" : webappOk ? "OK" : "ERROR"}</span>
+              <span className="text-xs text-white/70">
+                WebApp pagos: {webappOk === null ? "—" : webappOk ? "OK" : "ERROR"}
+              </span>
             </div>
-          )}
 
-          {/* SOCIO */}
-          {rol === "SOCIO" && (
-            <>
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                <Card className="p-4">
-                  <div className="text-xs text-white/70">Pagos validados {payYear}</div>
-                  <div className="mt-1 text-lg font-extrabold">{moneyPE(sumConfirmed)}</div>
-                </Card>
-                <Card className="p-4">
-                  <div className="text-xs text-white/70">Pagos pendientes {payYear}</div>
-                  <div className="mt-1 text-lg font-extrabold">{moneyPE(sumPending)}</div>
-                </Card>
-                <Card className="p-4">
-                  <div className="text-xs text-white/70">Pagos observados {payYear}</div>
-                  <div className="mt-1 text-lg font-extrabold">{moneyPE(sumRejected)}</div>
-                </Card>
+            <div className="mt-4 border-t border-white/10 pt-4">
+              <div className="text-sm font-extrabold">Validación de multas por entrenamiento</div>
+              <div className="mt-3 flex flex-wrap gap-2 items-center">
+                <SoftLink href={MULTAS_SHEET_URL} target="_blank" rel="noreferrer">
+                  Abrir Multas (Sheet)
+                </SoftLink>
+                <SoftButton onClick={syncValidatedFinesToSupabase} disabled={syncingFines}>
+                  {syncingFines ? "Sincronizando..." : "Sync multas validadas → Supabase"}
+                </SoftButton>
+                <span className="text-xs text-white/70">
+                  WebApp multas: {webappFinesOk === null ? "—" : webappFinesOk ? "OK" : "ERROR"}
+                </span>
               </div>
-
-              {/* ✅ NUEVO BLOQUE: Al día / habilitado */}
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <Card className="p-4">
-                  <div className="text-sm font-extrabold">¿Estás al día en tus pagos?</div>
-                  <div className="mt-1 text-xs text-white/70">
-                    Cálculo automático: al día {now.toISOString().slice(0, 10)} → Debes tener{" "}
-                    <span className="font-bold text-white">{moneyPE(expectedTotal)}</span> en pagos <b>validados</b> por el Admin.
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <div className="text-sm">
-                      Validados: <span className="font-extrabold">{moneyPE(sumConfirmed)}</span>
-                    </div>
-
-                    <div
-                      className={cn(
-                        "rounded-full border px-3 py-1 text-xs font-extrabold",
-                        isAlDia ? "bg-emerald-500/15 border-emerald-300/30 text-emerald-50" : "bg-red-500/15 border-red-300/30 text-red-100"
-                      )}
-                    >
-                      {isAlDia ? "✅ SÍ, estás al día" : "⛔ NO, no estás al día"}
-                    </div>
-                  </div>
-                </Card>
-
-                <Card className="p-4">
-                  <div className="text-sm font-extrabold">¿Habilitado por Pago para jugar?</div>
-                  <div className="mt-1 text-xs text-white/70">
-                    Requisito: estar al día y que tu <b>último pago validado</b> sea <b>antes o igual</b> al corte del mes (día 5 - 23:59:59).
-                  </div>
-
-                  <div className="mt-3 space-y-2">
-                    <div className="text-xs text-white/70">
-                      Corte mes actual:{" "}
-                      <span className="font-semibold text-white">{formatPE(currentMonthCutoff)} 23:59:59</span>
-                    </div>
-
-                    <div className="text-xs text-white/70">
-                      Último pago validado:{" "}
-                      <span className="font-semibold text-white">
-                        {lastValidatedDate ? `${formatPE(lastValidatedDate)} ${String(lastValidatedDate).slice(16, 21)}` : "—"}
-                      </span>
-                    </div>
-
-                    <div
-                      className={cn(
-                        "inline-flex w-fit rounded-full border px-3 py-1 text-xs font-extrabold",
-                        isHabilitado ? "bg-emerald-500/15 border-emerald-300/30 text-emerald-50" : "bg-red-500/15 border-red-300/30 text-red-100"
-                      )}
-                    >
-                      {isHabilitado ? "✅ SÍ (habilitado)" : "⛔ NO (no habilitado por pago)"}
-                    </div>
-                  </div>
-                </Card>
-              </div>
-
-              {/* ✅ Estado de validación + botón a página nueva */}
-              <Card className="mt-4 p-4">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <div>
-                    <div className="text-sm font-bold">Estado de validación (Admin)</div>
-                    <div className="mt-1 text-xs text-white/70">Se muestran las validaciones del año {payYear} para este socio.</div>
-                  </div>
-
-                  <Link
-                    to={`/estado-pagos?year=${payYear}`}
-                    className="inline-flex items-center rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-extrabold hover:bg-white/15 transition text-white"
-                  >
-                    Ver Todas las Validaciones de Pago del año
-                  </Link>
-                </div>
-
-                {lastValidatedPay ? (
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <div className="text-sm">
-                      <div className="font-semibold">
-                        {moneyPE(toNumberSafe(lastValidatedPay.amount))} ·{" "}
-                        <span className="text-white/70">{(lastValidatedPay.operation_datetime || lastValidatedPay.created_at || "").slice(0, 10)}</span>
-                      </div>
-                      {lastValidatedPay.admin_observaciones ? (
-                        <div className="mt-1 text-xs text-white/70">Obs: {String(lastValidatedPay.admin_observaciones)}</div>
-                      ) : null}
-                    </div>
-
-                    <div className={cn("rounded-full border px-3 py-1 text-xs font-extrabold", lastAdminBadge.cls)}>
-                      {lastAdminBadge.text}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-3 text-sm text-white/70">Aún no tienes pagos validados este año.</div>
-                )}
-              </Card>
-            </>
-          )}
-
-          {/* Week attendance */}
-          {rol === "SOCIO" && weekText && (
-            <div className="mt-5 space-y-4">
-              <Card className="p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-extrabold">Asistencia semanal</div>
-                    <div className="mt-1 text-sm text-white/75">{weekText}</div>
-                  </div>
-
-                  <Link
-                    to="/asistencias"
-                    className="inline-flex items-center rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-extrabold hover:bg-white/15 transition text-white"
-                  >
-                    Ver entrenamientos del año
-                  </Link>
-
-                  <div className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm">
-                    <span className="font-extrabold">{attendedCount}</span> / <span className="font-extrabold">{totalThisWeek}</span>{" "}
-                    <span className="text-white/70">asistencias</span>
-                  </div>
-                </div>
-
-                {attendedThisWeek === true && <div className="mt-3 text-sm">✅ Asistió esta semana.</div>}
-                {attendedThisWeek === false && <div className="mt-3 text-sm">⛔ No asistió esta semana.</div>}
-                {attendedThisWeek === null && <div className="mt-3 text-sm text-white/70">(No se pudo verificar.)</div>}
-              </Card>
-
-              <Card className="p-4">
-                <div className="text-sm font-extrabold">Entrenamientos de esta semana</div>
-                <div className="mt-1 text-xs text-white/70">Se marca ✅ si tienes asistencia registrada.</div>
-
-                <div className="mt-3 divide-y divide-white/10">
-                  {weekTrainings.map((t) => {
-                    const ok = attendanceMap.has(t.id);
-                    return (
-                      <div key={t.id} className="flex items-center justify-between py-3 gap-3">
-                        <div>
-                          <div className="text-sm font-semibold">
-                            {t.label || "Entrenamiento"} ·{" "}
-                            <span className="text-white/70">
-                              {t.training_date} {timeHHMM(t.start_time)}
-                            </span>
-                          </div>
-                          <div className="text-xs text-white/60">
-                            ID: <span className="font-mono">{t.id}</span>
-                          </div>
-                        </div>
-
-                        <div
-                          className={cn(
-                            "rounded-full border px-3 py-1 text-xs font-extrabold",
-                            ok ? "bg-emerald-500/15 border-emerald-300/30 text-emerald-50" : "bg-white/10 border-white/15 text-white/80"
-                          )}
-                        >
-                          {ok ? "✅ Asistió" : "⛔ No asistió"}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {weekTrainings.length === 0 && (
-                    <div className="py-3 text-sm text-white/70">
-                      Aún no hay entrenamientos cargados esta semana (por eso se muestra 0/{EXPECTED_WEEKLY} arriba).
-                    </div>
-                  )}
-                </div>
-              </Card>
             </div>
-          )}
-
-          {rol === "ADMIN" && <p className="mt-3 text-sm text-white/70">Como admin, puedes abrir la Sheet y validar. Eso se refleja en Supabase.</p>}
-        </Card>
+          </Card>
+        )}
       </main>
     </div>
   );
