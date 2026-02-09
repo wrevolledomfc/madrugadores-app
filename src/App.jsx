@@ -27,13 +27,9 @@ export default function App() {
       <PageTransition />
 
       <Routes>
-        {/* raíz */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-
-        {/* login SIN AppLayout */}
         <Route path="/login" element={<Login />} />
 
-        {/* todo lo demás CON AppLayout */}
         <Route element={<AppLayout />}>
           <Route
             path="/dashboard"
@@ -107,7 +103,7 @@ export default function App() {
             }
           />
 
-          {/* AdminScan protegido también */}
+          {/* ✅ PROTEGIDO + dentro del layout */}
           <Route
             path="/admin-scan"
             element={
@@ -153,7 +149,6 @@ export default function App() {
             }
           />
 
-          {/* fallback SIEMPRE AL FINAL */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Routes>
