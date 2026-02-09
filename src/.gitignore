@@ -1,0 +1,17 @@
+# Archivos sueltos (fotos / dumps / excel)
+*.jpg
+*.jpeg
+*.png
+*.rar
+*.xlsx
+
+# carpetas pesadas o temporales
+public/models/
+tools/
+src/assets/crests/
+src/assets/kits/
+
+# node / builds
+node_modules/
+dist/
+.vite/

@@ -164,20 +164,29 @@ export default function MisPagos() {
           </div>
         </div>
 
-        <div className="flex gap-2">
-          <Link
-            to="/pago"
-            className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-extrabold hover:bg-white/15 transition"
-          >
-            Registrar pago
-          </Link>
-          <button
-            onClick={load}
-            className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-extrabold hover:bg-white/15 transition"
-          >
-            Refrescar
-          </button>
-        </div>
+        <div className="flex gap-2 flex-wrap">
+  <Link
+    to="/dashboard"
+    className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-extrabold hover:bg-white/15 transition"
+  >
+    ← Panel principal
+  </Link>
+
+  <Link
+    to="/pago"
+    className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-extrabold hover:bg-white/15 transition"
+  >
+    Registrar pago
+  </Link>
+
+  <button
+    onClick={load}
+    className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-extrabold hover:bg-white/15 transition"
+  >
+    Refrescar
+  </button>
+</div>
+
       </div>
 
       {msg ? (

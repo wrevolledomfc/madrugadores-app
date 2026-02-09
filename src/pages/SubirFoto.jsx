@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 
+
+
 const BUCKET = "avatars";
 const MAX_BYTES = 1 * 1024 * 1024; // 1MB
 
@@ -84,27 +86,33 @@ export default function SubirFoto() {
   }, []);
 
   const onPickFile = (e) => {
-    setMsg("");
-    const f = e.target.files?.[0] || null;
-    if (!f) {
-      setFile(null);
-      return;
-    }
+  setMsg("");
+  const f = e.target.files?.[0] || null;
 
-    if (!isAllowedType(f)) {
-      setFile(null);
-      setMsg("Formato no permitido. Usa JPG/PNG/WEBP.");
-      return;
-    }
+  if (!f) {
+    setFile(null);
+    return;
+  }
 
-    if (f.size > MAX_BYTES) {
-      setFile(null);
-      setMsg("Tu archivo excede 1MB. Reduce el tamaño (o comprímelo) e intenta de nuevo.");
-      return;
-    }
+  if (!isAllowedType(f)) {
+    setFile(null);
+    setMsg("Formato no permitido. Usa JPG/PNG/WEBP.");
+    return;
+  }
 
-    setFile(f);
-  };
+  if (f.size > MAX_BYTES) {
+    setFile(null);
+    setMsg("Tu archivo excede 1MB. Reduce el tamaño e intenta de nuevo.");
+    return;
+  }
+
+  // ✅ tal cual, sin transformar
+  setFile(f);
+};
+
+
+
+
 
   const subirFoto = async () => {
     try {
@@ -119,10 +127,15 @@ export default function SubirFoto() {
 
       // guardaremos SIEMPRE con el mismo path por usuario -> permite reemplazar
       const ext = extFromType(file);
-      const objectPath = `${userId}/avatar.${ext}`;
+
+// nombre único cada vez → nunca cachea
+const objectPath = `${userId}/avatar-${Date.now()}.${ext}`;
 
       // Subir a storage (upsert reemplaza si existe)
-      const { error: upErr } = await supabase.storage
+      if (avatarPath) {
+  await supabase.storage.from(BUCKET).remove([avatarPath]);
+}
+const { error: upErr } = await supabase.storage
         .from(BUCKET)
         .upload(objectPath, file, {
           upsert: true,
@@ -148,7 +161,9 @@ export default function SubirFoto() {
       // refrescar URL
       const { data } = supabase.storage.from(BUCKET).getPublicUrl(objectPath);
       setAvatarPath(objectPath);
-      setAvatarPublicUrl(data?.publicUrl || "");
+      const url = data?.publicUrl ? `${data.publicUrl}?t=${Date.now()}` : "";
+setAvatarPublicUrl(url);
+
 
       setFile(null);
       setMsg("✅ Foto subida correctamente.");
@@ -223,12 +238,13 @@ export default function SubirFoto() {
         <div className="mt-4">
           <label className="block text-sm font-medium">Seleccionar archivo</label>
           <input
-            type="file"
-            accept="image/png,image/jpeg,image/jpg,image/webp"
-            onChange={onPickFile}
-            className="mt-2 block w-full text-sm"
-            disabled={saving}
-          />
+  type="file"
+  accept="image/png,image/jpeg,image/jpg,image/webp"
+  onChange={onPickFile}
+  className="mt-2 block w-full text-sm"
+  disabled={saving}
+/>
+
           <div className="mt-2 text-xs text-slate-500">
             Formatos: JPG/PNG/WEBP. Máximo: 1MB (Supabase lo bloquea si excede).
           </div>

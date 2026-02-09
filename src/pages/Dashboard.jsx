@@ -313,7 +313,7 @@ export default function Dashboard() {
       setWeekTrainings(
         list.map((t) => ({
           id: t.id,
-          open_at: t.checkin_open_at || null, // guardamos ISO real
+          open_at: t.checkin_open_at || null,
           training_date: String(t.checkin_open_at).slice(0, 10),
           start_time: String(t.checkin_open_at).slice(11, 16),
           label: t.label || "Entrenamiento",
@@ -395,7 +395,11 @@ export default function Dashboard() {
         const paymentId = String(item.payment_id || "").trim();
         if (!paymentId) continue;
 
-        const { data: exists, error: exErr } = await supabase.from("payments").select("id").eq("id", paymentId).maybeSingle();
+        const { data: exists, error: exErr } = await supabase
+          .from("payments")
+          .select("id")
+          .eq("id", paymentId)
+          .maybeSingle();
 
         if (exErr) {
           failCount++;
@@ -558,7 +562,6 @@ export default function Dashboard() {
 
   const c5 = useMemo(() => new Date(payYear, xMonth - 1, 5, 23, 59, 59, 999), [payYear, xMonth]);
   const c10 = useMemo(() => new Date(payYear, xMonth - 1, 10, 23, 59, 59, 999), [payYear, xMonth]);
-
   const cEOM = useMemo(() => new Date(payYear, xMonth, 0, 23, 59, 59, 999), [payYear, xMonth]);
 
   const w6to10Start = useMemo(() => new Date(payYear, xMonth - 1, 6, 0, 0, 0, 0), [payYear, xMonth]);
@@ -580,11 +583,9 @@ export default function Dashboard() {
     }
 
     const vrows = rowsYearValidated || [];
-
     let paidOnOrBefore5 = 0;
     let paid6to10 = 0;
     let paid11toEom = 0;
-
     let last = null;
 
     for (const r of vrows) {
@@ -631,11 +632,7 @@ export default function Dashboard() {
     }
 
     if (monthWindows.paidOnOrBefore5 >= 100) {
-      return {
-        ok: true,
-        title: "✅ Habilitado por pago",
-        text: "Al día y con registro dentro del plazo (hasta el 05). Puedes jugar.",
-      };
+      return { ok: true, title: "✅ Habilitado por pago", text: "Al día y con registro dentro del plazo (hasta el 05). Puedes jugar." };
     }
 
     if (monthWindows.paid6to10 >= 100) {
@@ -661,17 +658,14 @@ export default function Dashboard() {
     };
   }, [rol, isAlDia, now, c5, monthWindows, xMonth, payYear]);
 
-  const isHabilitadoPago = useMemo(() => {
-    if (rol !== "SOCIO") return true;
-    return paymentDecision.ok;
-  }, [rol, paymentDecision.ok]);
+  const isHabilitadoPago = useMemo(() => (rol !== "SOCIO" ? true : paymentDecision.ok), [rol, paymentDecision.ok]);
 
   const paymentRuleText = useMemo(() => {
     if (rol !== "SOCIO") return "";
     return `${paymentDecision.title}\n${paymentDecision.text}`;
   }, [rol, paymentDecision]);
 
-  // ===== ASISTENCIA SEMANAL (TEXTO CORRECTO) =====
+  // ===== ASISTENCIA SEMANAL (TEXTO) =====
   const attendedWeekText = useMemo(() => {
     if (rol !== "SOCIO") return "";
     if (attendedCount <= 0) return "Aún no has asistido a entrenamientos esta semana.";
@@ -679,9 +673,7 @@ export default function Dashboard() {
     return `Has asistido a ${attendedCount} entrenamientos esta semana.`;
   }, [rol, attendedCount]);
 
-  const remainingOpp = useMemo(() => {
-    return rol === "SOCIO" ? remainingOpportunitiesThisWeek(weekTrainings, new Date()) : 0;
-  }, [rol, weekTrainings]);
+  const remainingOpp = useMemo(() => (rol === "SOCIO" ? remainingOpportunitiesThisWeek(weekTrainings, new Date()) : 0), [rol, weekTrainings]);
 
   const opportunitiesText = useMemo(() => {
     if (rol !== "SOCIO") return "";
@@ -704,15 +696,8 @@ export default function Dashboard() {
   const entrenoRuleText = useMemo(() => {
     if (rol !== "SOCIO") return "";
     if (!needsFine) return "✅ Habilitado por entrenamiento (cumpliste entrenamientos).";
-
-    if (fineValidatedThisWeek) {
-      return "✅ Multa validada: habilitado por entrenamiento esta semana.";
-    }
-
-    if (!fridayNoonPassed) {
-      return "⛔ Te falta entrenamiento esta semana. Debes pagar la multa (S/100) hasta el viernes 12:00:00 (mediodía).";
-    }
-
+    if (fineValidatedThisWeek) return "✅ Multa validada: habilitado por entrenamiento esta semana.";
+    if (!fridayNoonPassed) return "⛔ Te falta entrenamiento esta semana. Debes pagar la multa (S/100) hasta el viernes 12:00:00 (mediodía).";
     return "⛔ No habilitado por entrenamiento: multa no pagada/validada dentro del plazo (viernes 12:00).";
   }, [rol, needsFine, fineValidatedThisWeek, fridayNoonPassed]);
 
@@ -725,7 +710,7 @@ export default function Dashboard() {
         <div className="mx-auto max-w-5xl px-4 py-4">
           <div className="flex items-center justify-between gap-3">
             {/* IZQUIERDA */}
-            <div className="flex items-center gap-4 min-w-0">
+            <div className="flex items-center gap-4 min-w-0 flex-1">
               <a
                 href="https://www.facebook.com/Madrugadoresfcoficial/"
                 target="_blank"
@@ -733,22 +718,24 @@ export default function Dashboard() {
                 className="shrink-0"
                 title="Facebook Madrugadores FC"
               >
-                <img
-                  src={madrugadoresLogo}
-                  alt="Madrugadores FC"
-                  className="h-16 w-16 sm:h-20 sm:w-20 object-contain"
-                />
+                <img src={madrugadoresLogo} alt="Madrugadores FC" className="h-14 w-14 sm:h-20 sm:w-20 object-contain" />
               </a>
 
-              <div className="min-w-0">
-                <h1 className="text-lg sm:text-2xl font-extrabold tracking-tight leading-none">MFC Online</h1>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base sm:text-2xl font-extrabold tracking-tight leading-none">MFC Online</h1>
 
-                <p className="mt-2 text-sm sm:text-base text-white/70 truncate">
-                  Conectado como <span className="font-semibold text-white">{nombre}</span> ·{" "}
-                  <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm font-bold">
+                <div className="mt-2 min-w-0">
+                  <div className="text-white/70 text-xs sm:text-sm">Conectado como</div>
+                  <div className="min-w-0">
+                    <span className="block font-semibold text-white text-sm sm:text-base leading-tight truncate">{nombre}</span>
+                  </div>
+                </div>
+
+                <div className="mt-1">
+                  <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] sm:text-sm font-bold">
                     {rol}
                   </span>
-                </p>
+                </div>
 
                 {msg && <p className="mt-1 text-sm text-red-200">{msg}</p>}
               </div>
@@ -757,18 +744,18 @@ export default function Dashboard() {
             {/* DERECHA */}
             <div className="flex items-center gap-3 shrink-0">
               {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt="Foto"
-                  className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl object-cover border border-white/20"
-                />
-              ) : (
-                <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-white/10 border border-white/15 grid place-items-center text-base">
-                  🙂
+                <div className="flex flex-col items-end gap-1">
+                  <img
+                    src={avatarUrl}
+                    alt="Foto"
+                    className="h-16 w-16 sm:h-18 sm:w-18 rounded-xl object-cover object-center border border-white/25 shadow-lg"
+                  />
                 </div>
+              ) : (
+                <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-white/10 border border-white/15 grid place-items-center">🙂</div>
               )}
 
-              <SoftButton onClick={salir} className="px-5 py-3 text-base sm:text-lg">
+              <SoftButton onClick={salir} className="px-4 py-2 sm:px-5 sm:py-3 text-sm sm:text-lg">
                 Salir
               </SoftButton>
             </div>
@@ -780,11 +767,7 @@ export default function Dashboard() {
       <div className="mx-auto max-w-5xl px-4 pt-4">
         <div className="overflow-hidden rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md shadow-[0_12px_35px_rgba(0,0,0,0.25)]">
           <a href={CLUB_URL} target="_blank" rel="noreferrer" className="block" title="Ver datos del campeonato">
-            <img
-              src={superligaBanner}
-              alt="Superliga Argentina 2026"
-              className="w-full object-cover transition hover:scale-[1.01]"
-            />
+            <img src={superligaBanner} alt="Superliga Argentina 2026" className="w-full object-cover transition hover:scale-[1.01]" />
           </a>
         </div>
       </div>
@@ -792,22 +775,17 @@ export default function Dashboard() {
       {/* Carrusel */}
       <div className="mx-auto max-w-5xl px-4 pt-3">
         <div className="mx-auto w-full max-w-5xl">
-          <SponsorCarousel
-            showTitle={false}
-            slidePaddingClassName="py-2 px-4"
-            imageClassName="max-h-20 sm:max-h-24 md:max-h-24 object-contain"
-          />
+          <SponsorCarousel showTitle={false} slidePaddingClassName="py-2 px-4" imageClassName="max-h-20 sm:max-h-24 md:max-h-24 object-contain" />
         </div>
       </div>
 
       <main className="mx-auto max-w-5xl px-4 py-6 space-y-4">
-
         {/* ===== FILA 3: QR y FOTO ===== */}
         <div className="grid gap-4 sm:grid-cols-2">
           <BigAction to="/mi-qr" title="Mi Carnet / QR" subtitle="Muestra tu QR al administrador o negocio." />
           <BigAction to="/mi-foto" title="Mi Foto" subtitle="Sube tu foto (máx 1MB)." />
         </div>
-        
+
         {/* ===== FILA 1: PAGO DEL MES ===== */}
         {rol === "SOCIO" && (
           <div className="grid gap-4 sm:grid-cols-1">
@@ -866,8 +844,8 @@ export default function Dashboard() {
 
                 <div className="mt-2 text-xs text-white/70">
                   Regla: hasta el <b>05 (23:59:59)</b> se exige estar al día con <b>100 × (mes-1)</b>. Desde el{" "}
-                  <b>06 (00:00:00)</b> se exige <b>100 × mes</b>. Si pagas después del 05: del <b>06 al 10</b> no juegas la fecha siguiente; desde el{" "}
-                  <b>11</b> no juegas todo el mes.
+                  <b>06 (00:00:00)</b> se exige <b>100 × mes</b>. Si pagas después del 05: del <b>06 al 10</b> no juegas la fecha
+                  siguiente; desde el <b>11</b> no juegas todo el mes.
                 </div>
 
                 <div className="mt-3 space-y-2">
@@ -879,7 +857,8 @@ export default function Dashboard() {
                   </div>
 
                   <div className="text-xs text-white/70">
-                    Último pago validado: <span className="font-semibold text-white">{lastValidatedDate ? formatPE(lastValidatedDate) : "—"}</span>
+                    Último pago validado:{" "}
+                    <span className="font-semibold text-white">{lastValidatedDate ? formatPE(lastValidatedDate) : "—"}</span>
                   </div>
 
                   <div
@@ -900,8 +879,6 @@ export default function Dashboard() {
         <div className="grid gap-4 sm:grid-cols-1">
           <BigAction href={CLUB_URL} external title="Datos del Torneo" subtitle="Tabla, posiciones, fixtures y estado del campeonato." />
         </div>
-
-        
 
         {/* ===== ASISTENCIA SEMANAL ===== */}
         {rol === "SOCIO" && weekText && (
@@ -951,12 +928,15 @@ export default function Dashboard() {
                 );
               })}
 
-              {weekTrainings.length === 0 && (
-                <div className="py-3 text-sm text-white/70">Aún no hay entrenamientos cargados esta semana.</div>
-              )}
+              {weekTrainings.length === 0 && <div className="py-3 text-sm text-white/70">Aún no hay entrenamientos cargados esta semana.</div>}
             </div>
           </Card>
         )}
+
+        {/* ===== ESTADOS DE CUENTA CLUB 2026 ===== */}
+        <div className="grid gap-4 sm:grid-cols-1">
+          <BigAction to="/estados-cuenta" title="Estados de cuenta del Club 2026" subtitle="Revisa el estado de cuenta mensual (Sheets)." />
+        </div>
 
         {/* ===== MULTA POR FALTA DE ENTRENAMIENTO ===== */}
         {rol === "SOCIO" && (
@@ -996,11 +976,7 @@ export default function Dashboard() {
                   subtitle="Monto fijo S/100. Plazo: viernes 12:00:00."
                   right={finePendingThisWeek ? "Tienes una multa pendiente esta semana" : ""}
                 />
-                <BigAction
-                  to="/mis-multas"
-                  title="Ver pagos de multas por no entrenar"
-                  subtitle="Historial y estado (pendiente/validado/observado)."
-                />
+                <BigAction to="/mis-multas" title="Ver pagos de multas por no entrenar" subtitle="Historial y estado (pendiente/validado/observado)." />
               </div>
             )}
           </Card>
@@ -1009,34 +985,46 @@ export default function Dashboard() {
         {/* ===== ADMIN ===== */}
         {rol === "ADMIN" && (
           <Card className="p-5">
+            {/* Botón Admin: Escanear QR */}
+            <div className="grid gap-3 sm:grid-cols-1 mb-4">
+              <BigAction
+                to="/admin-scan"
+                title="Escanear QR (Administrador)"
+                subtitle="Registrar asistencia a entrenamientos escaneando el carnet/QR del socio."
+              />
+            </div>
+
             <div className="text-sm font-extrabold">Panel Admin</div>
+
             <div className="mt-3 flex flex-wrap gap-2 items-center">
               <SoftLink href={SHEET_URL} target="_blank" rel="noreferrer">
                 Abrir Validación de Pagos (Sheet)
               </SoftLink>
+
               <SoftLink href={ASISTENCIAS_SHEET_URL} target="_blank" rel="noreferrer">
                 Abrir Asistencias (Sheet)
               </SoftLink>
+
               <SoftButton onClick={syncValidatedPaymentsToSupabase} disabled={syncingPayments}>
                 {syncingPayments ? "Sincronizando..." : "Sync pagos validados → Supabase"}
               </SoftButton>
-              <span className="text-xs text-white/70">
-                WebApp pagos: {webappOk === null ? "—" : webappOk ? "OK" : "ERROR"}
-              </span>
+
+              <span className="text-xs text-white/70">WebApp pagos: {webappOk === null ? "—" : webappOk ? "OK" : "ERROR"}</span>
             </div>
 
             <div className="mt-4 border-t border-white/10 pt-4">
               <div className="text-sm font-extrabold">Validación de multas por entrenamiento</div>
+
               <div className="mt-3 flex flex-wrap gap-2 items-center">
                 <SoftLink href={MULTAS_SHEET_URL} target="_blank" rel="noreferrer">
                   Abrir Multas (Sheet)
                 </SoftLink>
+
                 <SoftButton onClick={syncValidatedFinesToSupabase} disabled={syncingFines}>
                   {syncingFines ? "Sincronizando..." : "Sync multas validadas → Supabase"}
                 </SoftButton>
-                <span className="text-xs text-white/70">
-                  WebApp multas: {webappFinesOk === null ? "—" : webappFinesOk ? "OK" : "ERROR"}
-                </span>
+
+                <span className="text-xs text-white/70">WebApp multas: {webappFinesOk === null ? "—" : webappFinesOk ? "OK" : "ERROR"}</span>
               </div>
             </div>
           </Card>

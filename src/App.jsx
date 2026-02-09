@@ -19,6 +19,7 @@ import EstadoPagos from "./pages/EstadoPagos.jsx";
 import MisPagos from "./pages/MisPagos.jsx";
 import PagoMulta from "./pages/PagoMulta.jsx";
 import MisMultas from "./pages/MisMultas.jsx";
+import EstadosCuenta from "./pages/EstadosCuenta.jsx";
 
 export default function App() {
   return (
@@ -106,6 +107,7 @@ export default function App() {
             }
           />
 
+          {/* AdminScan protegido también */}
           <Route
             path="/admin-scan"
             element={
@@ -138,6 +140,15 @@ export default function App() {
             element={
               <RequireAuth>
                 <AsistenciasAnuales />
+              </RequireAuth>
+            }
+          />
+
+          <Route
+            path="/estados-cuenta"
+            element={
+              <RequireAuth>
+                <EstadosCuenta />
               </RequireAuth>
             }
           />
