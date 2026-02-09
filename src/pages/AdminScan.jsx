@@ -43,32 +43,15 @@ export default function AdminScan() {
 
     // ✅ Trae trainings de HOY (Lima) y encuentra el que esté abierto ahora
     const findOpenTraining = async () => {
-      const now = new Date(); // hora local del dispositivo (no importa, comparamos por timestamps)
-      const nowMs = now.getTime();
-      const todayLima = limaYmd(now);
+  const { data, error } = await supabase.rpc("get_open_training");
+  if (error) return { training: null, error };
 
-      const { data, error } = await supabase
-        .from("trainings")
-        .select("id, label, training_date, start_time, checkin_open_at, checkin_close_at")
-        .eq("training_date", todayLima)
-        .order("checkin_open_at", { ascending: false });
+  const training = Array.isArray(data) ? data[0] : data;
+  return { training: training || null, error: null };
+};
 
-      if (error) return { training: null, error };
 
-      const openNow = (data || []).find((t) => {
-        const open = t.checkin_open_at ? new Date(t.checkin_open_at).getTime() : NaN;
-        if (!Number.isFinite(open)) return false;
 
-        // ✅ Si no hay close, asumimos ventana 1 hora
-        const close = t.checkin_close_at
-          ? new Date(t.checkin_close_at).getTime()
-          : open + 60 * 60 * 1000;
-
-        return nowMs >= open && nowMs < close;
-      });
-
-      return { training: openNow || null, error: null };
-    };
 
     const start = async () => {
       try {
