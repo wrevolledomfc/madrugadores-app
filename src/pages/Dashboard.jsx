@@ -71,7 +71,7 @@ function peNow() {
 function getWeekRange(now = new Date()) {
   const d = new Date(now);
   d.setHours(0, 0, 0, 0);
-  const dow = d.getDay();
+  const dow = d.getDay(); // 0 dom .. 6 sab
   const diffToMonday = (dow === 0 ? -6 : 1) - dow;
 
   const monday = new Date(d);
@@ -85,6 +85,24 @@ function getWeekRange(now = new Date()) {
   return { monday, sunday };
 }
 
+// ✅ FIX: construir ISO en -05:00 sin usar toISOString() (que es UTC)
+function isoPEStartOfDay(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  const yyyy = x.getFullYear();
+  const mm = String(x.getMonth() + 1).padStart(2, "0");
+  const dd = String(x.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}T00:00:00-05:00`;
+}
+function isoPEEndOfDay(d) {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  const yyyy = x.getFullYear();
+  const mm = String(x.getMonth() + 1).padStart(2, "0");
+  const dd = String(x.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}T23:59:59-05:00`;
+}
+
 function isFridayNoonPassed(now = new Date()) {
   const d = new Date(now);
   const day = d.getDay(); // 0 dom .. 5 vie
@@ -95,32 +113,19 @@ function isFridayNoonPassed(now = new Date()) {
   return d.getTime() > noon.getTime();
 }
 
-function startOfWeekMonday(d = new Date()) {
-  const x = new Date(d);
-  const day = x.getDay(); // 0=Dom, 1=Lun...
-  const diff = day === 0 ? -6 : 1 - day; // lunes como inicio
-  x.setDate(x.getDate() + diff);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
 function endOfWeekSunday(d = new Date()) {
-  const s = startOfWeekMonday(d);
-  const e = new Date(s);
-  e.setDate(e.getDate() + 6);
-  e.setHours(23, 59, 59, 999);
-  return e;
+  const { sunday } = getWeekRange(d);
+  return sunday;
 }
 
 function remainingOpportunitiesThisWeek(weekTrainings, now = new Date()) {
   const end = endOfWeekSunday(now);
-  if (now > end) return 0; // semana terminada
-
+  if (now > end) return 0;
   return (weekTrainings || []).filter((t) => {
     if (!t?.open_at) return false;
     const dt = new Date(t.open_at);
     if (Number.isNaN(dt.getTime())) return false;
-    return dt >= now; // aún no ocurre
+    return dt >= now;
   }).length;
 }
 
@@ -226,7 +231,8 @@ export default function Dashboard() {
   const [syncingFines, setSyncingFines] = useState(false);
   const [webappFinesOk, setWebappFinesOk] = useState(null);
 
-  const EXPECTED_WEEKLY = 4;
+  // ✅ NUEVA REGLA: habilitado con al menos 1 entrenamiento en la semana
+  const EXPECTED_WEEKLY = 1;
 
   const attendedCount = useMemo(() => attendanceMap.size, [attendanceMap]);
   const totalThisWeek = useMemo(
@@ -295,9 +301,11 @@ export default function Dashboard() {
     const { monday, sunday } = getWeekRange(new Date());
     setWeekText(`Semana del ${formatPE(monday)} al ${formatPE(sunday)}`);
 
-    const startIso = `${monday.toISOString().slice(0, 10)}T00:00:00-05:00`;
-    const endIso = `${sunday.toISOString().slice(0, 10)}T23:59:59-05:00`;
+    // ✅ FIX RANGO PE (NO UTC)
+    const startIso = isoPEStartOfDay(monday);
+    const endIso = isoPEEndOfDay(sunday);
 
+    // TRAININGS (semana)
     const { data: trainings, error: tErr } = await supabase
       .from("trainings")
       .select("id, label, checkin_open_at")
@@ -321,6 +329,7 @@ export default function Dashboard() {
       );
     }
 
+    // ATTENDANCE (semana)
     const { data: atts, error: aErr } = await supabase
       .from("attendance")
       .select("training_id, scanned_at")
@@ -343,8 +352,8 @@ export default function Dashboard() {
 
   const loadSocioFinesThisWeek = async (userId) => {
     const { monday, sunday } = getWeekRange(new Date());
-    const startIso = `${monday.toISOString().slice(0, 10)}T00:00:00-05:00`;
-    const endIso = `${sunday.toISOString().slice(0, 10)}T23:59:59-05:00`;
+    const startIso = isoPEStartOfDay(monday);
+    const endIso = isoPEEndOfDay(sunday);
 
     const { data, error } = await supabase
       .from("training_fines")
@@ -665,7 +674,7 @@ export default function Dashboard() {
     return `${paymentDecision.title}\n${paymentDecision.text}`;
   }, [rol, paymentDecision]);
 
-  // ===== ASISTENCIA SEMANAL (TEXTO) =====
+  // ===== ASISTENCIA SEMANAL =====
   const attendedWeekText = useMemo(() => {
     if (rol !== "SOCIO") return "";
     if (attendedCount <= 0) return "Aún no has asistido a entrenamientos esta semana.";
@@ -673,19 +682,24 @@ export default function Dashboard() {
     return `Has asistido a ${attendedCount} entrenamientos esta semana.`;
   }, [rol, attendedCount]);
 
-  const remainingOpp = useMemo(() => (rol === "SOCIO" ? remainingOpportunitiesThisWeek(weekTrainings, new Date()) : 0), [rol, weekTrainings]);
+  const remainingOpp = useMemo(
+    () => (rol === "SOCIO" ? remainingOpportunitiesThisWeek(weekTrainings, new Date()) : 0),
+    [rol, weekTrainings]
+  );
 
+  // ✅ FIX: no repetir “no hay entrenamientos” (lo mostramos solo abajo)
   const opportunitiesText = useMemo(() => {
     if (rol !== "SOCIO") return "";
-    if (weekTrainings.length === 0) return "Aún no hay entrenamientos cargados esta semana.";
+    if (weekTrainings.length === 0) return "";
     if (remainingOpp === 0) return "Ya no quedan oportunidades para entrenar esta semana.";
     return `Te quedan ${remainingOpp} oportunidad${remainingOpp === 1 ? "" : "es"} para entrenar esta semana.`;
   }, [rol, weekTrainings.length, remainingOpp]);
 
-  // ===== ENTRENAMIENTO =====
+  // ===== ENTRENAMIENTO / HABILITACIÓN =====
   const needsFine = useMemo(() => (rol === "SOCIO" ? attendedCount < EXPECTED_WEEKLY : false), [rol, attendedCount]);
   const fridayNoonPassed = useMemo(() => isFridayNoonPassed(now), [now]);
 
+  // ✅ Con EXPECTED_WEEKLY=1: si entrenó 1 vez, habilitado
   const habilitadoEntreno = useMemo(() => {
     if (rol !== "SOCIO") return null;
     if (!needsFine) return true;
@@ -695,7 +709,7 @@ export default function Dashboard() {
 
   const entrenoRuleText = useMemo(() => {
     if (rol !== "SOCIO") return "";
-    if (!needsFine) return "✅ Habilitado por entrenamiento (cumpliste entrenamientos).";
+    if (!needsFine) return "✅ Habilitado por entrenamiento (asististe al menos 1 vez esta semana).";
     if (fineValidatedThisWeek) return "✅ Multa validada: habilitado por entrenamiento esta semana.";
     if (!fridayNoonPassed) return "⛔ Te falta entrenamiento esta semana. Debes pagar la multa (S/100) hasta el viernes 12:00:00 (mediodía).";
     return "⛔ No habilitado por entrenamiento: multa no pagada/validada dentro del plazo (viernes 12:00).";
@@ -767,7 +781,7 @@ export default function Dashboard() {
       <div className="mx-auto max-w-5xl px-4 pt-4">
         <div className="overflow-hidden rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md shadow-[0_12px_35px_rgba(0,0,0,0.25)]">
           <a href={CLUB_URL} target="_blank" rel="noreferrer" className="block" title="Ver datos del campeonato">
-            <img src={superligaBanner} alt="Superliga Argentina 2026" className="w-full object-cover transition hover:scale-[1.01]" />
+            <img src={superligaBanner} alt="Superliga Argentina 2026" className="w-full object-cover transition hover:scale-[0.01]" />
           </a>
         </div>
       </div>
@@ -780,13 +794,13 @@ export default function Dashboard() {
       </div>
 
       <main className="mx-auto max-w-5xl px-4 py-6 space-y-4">
-        {/* ===== FILA 3: QR y FOTO ===== */}
+        {/* FILA 3: QR y FOTO */}
         <div className="grid gap-4 sm:grid-cols-2">
           <BigAction to="/mi-qr" title="Mi Carnet / QR" subtitle="Muestra tu QR al administrador o negocio." />
           <BigAction to="/mi-foto" title="Mi Foto" subtitle="Sube tu foto (máx 1MB)." />
         </div>
 
-        {/* ===== FILA 1: PAGO DEL MES ===== */}
+        {/* FILA 1: PAGO DEL MES */}
         {rol === "SOCIO" && (
           <div className="grid gap-4 sm:grid-cols-1">
             <BigAction
@@ -810,7 +824,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ===== ESTADO DE PAGOS ===== */}
+        {/* ESTADO DE PAGOS */}
         {rol === "SOCIO" && (
           <Card className="p-5">
             <div className="text-sm font-extrabold">Estado de Pagos</div>
@@ -875,12 +889,12 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* ===== FILA 2: DATOS DEL TORNEO ===== */}
+        {/* DATOS DEL TORNEO */}
         <div className="grid gap-4 sm:grid-cols-1">
           <BigAction href={CLUB_URL} external title="Datos del Torneo" subtitle="Tabla, posiciones, fixtures y estado del campeonato." />
         </div>
 
-        {/* ===== ASISTENCIA SEMANAL ===== */}
+        {/* ASISTENCIA SEMANAL */}
         {rol === "SOCIO" && weekText && (
           <Card className="p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -890,7 +904,7 @@ export default function Dashboard() {
 
                 <div className="mt-2 text-xs text-white/80">
                   <div>{attendedWeekText}</div>
-                  <div>{opportunitiesText}</div>
+                  {opportunitiesText ? <div>{opportunitiesText}</div> : null}
                 </div>
               </div>
 
@@ -933,12 +947,12 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* ===== ESTADOS DE CUENTA CLUB 2026 ===== */}
+        {/* ESTADOS DE CUENTA CLUB 2026 */}
         <div className="grid gap-4 sm:grid-cols-1">
           <BigAction to="/estados-cuenta" title="Estados de cuenta del Club 2026" subtitle="Revisa el estado de cuenta mensual (Sheets)." />
         </div>
 
-        {/* ===== MULTA POR FALTA DE ENTRENAMIENTO ===== */}
+        {/* HABILITADO POR ENTRENAMIENTO */}
         {rol === "SOCIO" && (
           <Card className="p-5">
             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -982,10 +996,9 @@ export default function Dashboard() {
           </Card>
         )}
 
-        {/* ===== ADMIN ===== */}
+        {/* ADMIN */}
         {rol === "ADMIN" && (
           <Card className="p-5">
-            {/* Botón Admin: Escanear QR */}
             <div className="grid gap-3 sm:grid-cols-1 mb-4">
               <BigAction
                 to="/admin-scan"
