@@ -71,7 +71,8 @@ export default function PagoMulta() {
 
       const { data: profile, error: pErr } = await supabase
         .from("profiles")
-        .select("full_name, dni")
+        .select("full_name, dni, equipo")
+
         .eq("id", user.id)
         .maybeSingle();
 
@@ -94,6 +95,8 @@ export default function PagoMulta() {
       const payload = {
         user_id: user.id,
         socio_name: profile.full_name,
+        equipo: profile.equipo || "",
+
         socio_email: user.email || "",
         socio_dni: profile.dni,
         amount: FINE_AMOUNT,
@@ -108,6 +111,7 @@ export default function PagoMulta() {
 
         admin_verification: "Pendiente",
         admin_observaciones: null,
+        
       };
 
       const { error: insErr } = await supabase.from("training_fines").insert(payload);

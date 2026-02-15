@@ -15,7 +15,7 @@ const CLUB_URL = import.meta.env.VITE_CLUB_URL || "https://sites.google.com/view
 // Sheets/Admin
 const SHEETS_WEBAPP_URL = import.meta.env.VITE_PAGOS_WEBAPP_URL; // /exec pagos
 const SHEET_URL = import.meta.env.VITE_PAGOS_SHEET_URL;
-const ASISTENCIAS_SHEET_URL = import.meta.env.VITE_ASISTENCIAS_SHEET_URL;
+const ASISTENCIAS_SHEET_URL = "https://docs.google.com/spreadsheets/d/1XxDB__Fh6MWHtT-VJG6KLoBBta948lAwz778mEmqR8M/edit?gid=812783321#gid=8127833210";
 
 // Multas (admin)
 const MULTAS_WEBAPP_URL = import.meta.env.VITE_MULTAS_WEBAPP_URL; // /exec multas
@@ -48,7 +48,6 @@ function toNumberSafe(x) {
   const n = Number(String(x ?? "").replace(",", "."));
   return Number.isFinite(n) ? n : 0;
 }
-
 function normalizeAdminVerification(v) {
   const s = String(v || "").trim().toLowerCase();
   if (s === "validado") return "Validado";
@@ -56,14 +55,12 @@ function normalizeAdminVerification(v) {
   if (s === "pendiente") return "Pendiente";
   return "Pendiente";
 }
-
 function parseBestDate(row) {
   const iso = row?.operation_datetime || row?.created_at;
   if (!iso) return null;
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? null : d;
 }
-
 function peNow() {
   return new Date();
 }
@@ -85,7 +82,7 @@ function getWeekRange(now = new Date()) {
   return { monday, sunday };
 }
 
-// ✅ FIX: construir ISO en -05:00 sin usar toISOString() (que es UTC)
+// ✅ ISO en -05:00 SIN UTC
 function isoPEStartOfDay(d) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
@@ -231,7 +228,7 @@ export default function Dashboard() {
   const [syncingFines, setSyncingFines] = useState(false);
   const [webappFinesOk, setWebappFinesOk] = useState(null);
 
-  // ✅ NUEVA REGLA: habilitado con al menos 1 entrenamiento en la semana
+  // ✅ Regla: habilitado por entrenamiento con al menos 1 asistencia semanal
   const EXPECTED_WEEKLY = 1;
 
   const attendedCount = useMemo(() => attendanceMap.size, [attendanceMap]);
@@ -301,7 +298,6 @@ export default function Dashboard() {
     const { monday, sunday } = getWeekRange(new Date());
     setWeekText(`Semana del ${formatPE(monday)} al ${formatPE(sunday)}`);
 
-    // ✅ FIX RANGO PE (NO UTC)
     const startIso = isoPEStartOfDay(monday);
     const endIso = isoPEEndOfDay(sunday);
 
@@ -404,12 +400,7 @@ export default function Dashboard() {
         const paymentId = String(item.payment_id || "").trim();
         if (!paymentId) continue;
 
-        const { data: exists, error: exErr } = await supabase
-          .from("payments")
-          .select("id")
-          .eq("id", paymentId)
-          .maybeSingle();
-
+        const { data: exists, error: exErr } = await supabase.from("payments").select("id").eq("id", paymentId).maybeSingle();
         if (exErr) {
           failCount++;
           continue;
@@ -423,7 +414,6 @@ export default function Dashboard() {
         const admin_observaciones = item.admin_observaciones == null ? null : String(item.admin_observaciones);
 
         const payload = { admin_verification, admin_observaciones };
-
         const { error } = await supabase.from("payments").update(payload).eq("id", paymentId);
         if (error) failCount++;
         else okCount++;
@@ -465,12 +455,7 @@ export default function Dashboard() {
         const fineId = String(item.fine_id || "").trim();
         if (!fineId) continue;
 
-        const { data: exists, error: exErr } = await supabase
-          .from("training_fines")
-          .select("id")
-          .eq("id", fineId)
-          .maybeSingle();
-
+        const { data: exists, error: exErr } = await supabase.from("training_fines").select("id").eq("id", fineId).maybeSingle();
         if (exErr) {
           failCount++;
           continue;
@@ -484,7 +469,6 @@ export default function Dashboard() {
         const admin_observaciones = item.admin_observaciones == null ? null : String(item.admin_observaciones);
 
         const payload = { admin_verification, admin_observaciones };
-
         const { error } = await supabase.from("training_fines").update(payload).eq("id", fineId);
         if (error) failCount++;
         else okCount++;
@@ -687,7 +671,6 @@ export default function Dashboard() {
     [rol, weekTrainings]
   );
 
-  // ✅ FIX: no repetir “no hay entrenamientos” (lo mostramos solo abajo)
   const opportunitiesText = useMemo(() => {
     if (rol !== "SOCIO") return "";
     if (weekTrainings.length === 0) return "";
@@ -699,11 +682,10 @@ export default function Dashboard() {
   const needsFine = useMemo(() => (rol === "SOCIO" ? attendedCount < EXPECTED_WEEKLY : false), [rol, attendedCount]);
   const fridayNoonPassed = useMemo(() => isFridayNoonPassed(now), [now]);
 
-  // ✅ Con EXPECTED_WEEKLY=1: si entrenó 1 vez, habilitado
   const habilitadoEntreno = useMemo(() => {
     if (rol !== "SOCIO") return null;
-    if (!needsFine) return true;
-    if (fineValidatedThisWeek) return true;
+    if (!needsFine) return true; // asistió al menos 1 vez
+    if (fineValidatedThisWeek) return true; // multa validada
     return false;
   }, [rol, needsFine, fineValidatedThisWeek]);
 
@@ -711,9 +693,12 @@ export default function Dashboard() {
     if (rol !== "SOCIO") return "";
     if (!needsFine) return "✅ Habilitado por entrenamiento (asististe al menos 1 vez esta semana).";
     if (fineValidatedThisWeek) return "✅ Multa validada: habilitado por entrenamiento esta semana.";
-    if (!fridayNoonPassed) return "⛔ Te falta entrenamiento esta semana. Debes pagar la multa (S/100) hasta el viernes 12:00:00 (mediodía).";
+    if (!fridayNoonPassed) return "⛔ No asististe esta semana. Paga la multa (S/100) hasta el viernes 12:00:00 (mediodía).";
     return "⛔ No habilitado por entrenamiento: multa no pagada/validada dentro del plazo (viernes 12:00).";
   }, [rol, needsFine, fineValidatedThisWeek, fridayNoonPassed]);
+
+  // ✅ CTA SOLO cuando NO entrenó (attendedCount=0)
+  const showFineCTA = useMemo(() => rol === "SOCIO" && attendedCount === 0, [rol, attendedCount]);
 
   if (loading) return <LoadingScreen text="Cargando..." />;
 
@@ -723,7 +708,6 @@ export default function Dashboard() {
       <header className="sticky top-0 z-20 border-b border-white/10 bg-black/30 backdrop-blur-md">
         <div className="mx-auto max-w-5xl px-4 py-4">
           <div className="flex items-center justify-between gap-3">
-            {/* IZQUIERDA */}
             <div className="flex items-center gap-4 min-w-0 flex-1">
               <a
                 href="https://www.facebook.com/Madrugadoresfcoficial/"
@@ -755,7 +739,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* DERECHA */}
             <div className="flex items-center gap-3 shrink-0">
               {avatarUrl ? (
                 <div className="flex flex-col items-end gap-1">
@@ -766,7 +749,9 @@ export default function Dashboard() {
                   />
                 </div>
               ) : (
-                <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-white/10 border border-white/15 grid place-items-center">🙂</div>
+                <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-white/10 border border-white/15 grid place-items-center">
+                  🙂
+                </div>
               )}
 
               <SoftButton onClick={salir} className="px-4 py-2 sm:px-5 sm:py-3 text-sm sm:text-lg">
@@ -781,7 +766,7 @@ export default function Dashboard() {
       <div className="mx-auto max-w-5xl px-4 pt-4">
         <div className="overflow-hidden rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md shadow-[0_12px_35px_rgba(0,0,0,0.25)]">
           <a href={CLUB_URL} target="_blank" rel="noreferrer" className="block" title="Ver datos del campeonato">
-            <img src={superligaBanner} alt="Superliga Argentina 2026" className="w-full object-cover transition hover:scale-[0.01]" />
+            <img src={superligaBanner} alt="Superliga Argentina 2026" className="w-full object-cover transition hover:scale-[1.01]" />
           </a>
         </div>
       </div>
@@ -794,13 +779,13 @@ export default function Dashboard() {
       </div>
 
       <main className="mx-auto max-w-5xl px-4 py-6 space-y-4">
-        {/* FILA 3: QR y FOTO */}
+        {/* QR y FOTO */}
         <div className="grid gap-4 sm:grid-cols-2">
           <BigAction to="/mi-qr" title="Mi Carnet / QR" subtitle="Muestra tu QR al administrador o negocio." />
           <BigAction to="/mi-foto" title="Mi Foto" subtitle="Sube tu foto (máx 1MB)." />
         </div>
 
-        {/* FILA 1: PAGO DEL MES */}
+        {/* PAGO DEL MES */}
         {rol === "SOCIO" && (
           <div className="grid gap-4 sm:grid-cols-1">
             <BigAction
@@ -959,7 +944,8 @@ export default function Dashboard() {
               <div>
                 <div className="text-sm font-extrabold">Habilitado por entrenamiento</div>
                 <div className="mt-1 text-xs text-white/70">
-                  Asistencias esta semana: <b>{attendedCount}</b> / <b>{totalThisWeek}</b>. Si te falta, multa S/100 hasta viernes 12:00:00.
+                  Asistencias esta semana: <b>{attendedCount}</b> / <b>{totalThisWeek}</b>.
+                  {showFineCTA ? " Si no entrenas, multa S/100 hasta viernes 12:00:00." : ""}
                 </div>
               </div>
 
@@ -982,15 +968,25 @@ export default function Dashboard() {
               {entrenoRuleText}
             </div>
 
-            {habilitadoEntreno === false && (
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <BigAction
-                  to="/multa"
-                  title="Sube tu pago de multa por falta de entrenamiento"
-                  subtitle="Monto fijo S/100. Plazo: viernes 12:00:00."
-                  right={finePendingThisWeek ? "Tienes una multa pendiente esta semana" : ""}
-                />
-                <BigAction to="/mis-multas" title="Ver pagos de multas por no entrenar" subtitle="Historial y estado (pendiente/validado/observado)." />
+            {/* ✅ LO QUE ME PEDISTE: CTA de multa SOLO si no asistió a ningún entrenamiento */}
+            {showFineCTA && (
+              <div className="mt-4 space-y-3">
+                <Card className="p-4">
+                  <div className="text-sm font-extrabold">Paga tu multa para habilitarte</div>
+                  <div className="mt-1 text-xs text-white/70">
+                    No registras asistencia esta semana. Para habilitarte debes pagar <b>S/100</b> (plazo: <b>viernes 12:00:00</b>).
+                  </div>
+                </Card>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <BigAction
+                    to="/multa"
+                    title="Registrar pago de multa por entrenamiento"
+                    subtitle="Sube tu voucher (S/100). Plazo: viernes 12:00:00."
+                    right={finePendingThisWeek ? "Tienes una multa pendiente" : ""}
+                  />
+                  <BigAction to="/mis-multas" title="Ver mis multas" subtitle="Historial y estado (pendiente/validado/observado)." />
+                </div>
               </div>
             )}
           </Card>
