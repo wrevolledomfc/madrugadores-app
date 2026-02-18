@@ -3,16 +3,30 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
-function moneyDatePE(iso) {
-  if (!iso) return "";
+/**
+ * Convierte timestamptz/ISO a "YYYY-MM-DD HH:MM" en hora Perú (America/Lima).
+ * No hace "slice" (eso NO convierte zona horaria).
+ */
+function dateTimePE(value) {
+  if (!value) return "";
   try {
-    // iso puede ser timestamptz; lo mostramos como YYYY-MM-DD HH:MM
-    const s = String(iso);
-    const d = s.slice(0, 10);
-    const t = s.slice(11, 16);
-    return `${d} ${t}`;
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Lima",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(d);
+
+    const get = (type) => parts.find((p) => p.type === type)?.value ?? "";
+    return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
   } catch {
-    return String(iso);
+    return String(value);
   }
 }
 
@@ -25,6 +39,8 @@ export default function AsistenciasAnuales() {
   const total = useMemo(() => rows.length, [rows]);
 
   useEffect(() => {
+    let alive = true;
+
     const cargar = async () => {
       setLoading(true);
       setMsg("");
@@ -38,7 +54,7 @@ export default function AsistenciasAnuales() {
         return;
       }
 
-      // Rango anual en UTC (suficiente y simple)
+      // Rango anual en UTC (para filtro en BD; el DISPLAY lo hacemos en America/Lima)
       const startIso = `${year}-01-01T00:00:00.000Z`;
       const endIso = `${year + 1}-01-01T00:00:00.000Z`;
 
@@ -50,6 +66,8 @@ export default function AsistenciasAnuales() {
         .gte("scanned_at", startIso)
         .lt("scanned_at", endIso)
         .order("scanned_at", { ascending: false });
+
+      if (!alive) return;
 
       if (aErr) {
         setMsg("No pude cargar tus asistencias: " + aErr.message);
@@ -72,8 +90,10 @@ export default function AsistenciasAnuales() {
         .select("id, label, checkin_open_at")
         .in("id", trainingIds);
 
+      if (!alive) return;
+
       if (tErr) {
-        // Si falla join, igual mostramos algo
+        // Si falla, igual mostramos algo (solo asistencia)
         setRows(
           attList.map((a) => ({
             training_id: a.training_id,
@@ -105,6 +125,10 @@ export default function AsistenciasAnuales() {
     };
 
     cargar();
+
+    return () => {
+      alive = false;
+    };
   }, [year]);
 
   if (loading) {
@@ -157,12 +181,15 @@ export default function AsistenciasAnuales() {
                     <div className="text-sm font-medium">
                       {r.label}{" "}
                       <span className="text-slate-600">
-                        · {moneyDatePE(r.checkin_open_at || r.scanned_at)}
+                        · {dateTimePE(r.checkin_open_at || r.scanned_at)}
                       </span>
                     </div>
+
                     <div className="text-xs text-slate-500">
-                      Asistencia marcada: <span className="font-mono">{moneyDatePE(r.scanned_at)}</span>
+                      Asistencia marcada:{" "}
+                      <span className="font-mono">{dateTimePE(r.scanned_at)}</span>
                     </div>
+
                     <div className="text-xs text-slate-500">
                       ID: <span className="font-mono">{r.training_id}</span>
                     </div>
