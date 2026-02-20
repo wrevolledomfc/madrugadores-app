@@ -8,11 +8,17 @@ const FINE_AMOUNT = 100;
 
 function Card({ className, children }) {
   return (
-    <div className={cn("rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md shadow-[0_12px_35px_rgba(0,0,0,0.25)]", className)}>
+    <div
+      className={cn(
+        "rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md shadow-[0_12px_35px_rgba(0,0,0,0.25)]",
+        className
+      )}
+    >
       {children}
     </div>
   );
 }
+
 function Input({ className, ...props }) {
   return (
     <input
@@ -24,8 +30,24 @@ function Input({ className, ...props }) {
     />
   );
 }
+
 function Label({ children }) {
   return <span className="mb-1 block text-sm font-semibold text-white/85">{children}</span>;
+}
+
+// Helpers
+function sanitizeFileName(name) {
+  return String(name || "archivo")
+    .replace(/\r?\n/g, "")
+    .replace(/[^\w.\-() ]+/g, "_")
+    .trim();
+}
+
+// Convierte fecha/hora (inputs HTML) a ISO con zona Perú -05:00
+function buildPeruIso(fecha, hora) {
+  // fecha: YYYY-MM-DD, hora: HH:mm
+  // timestamptz: YYYY-MM-DDTHH:mm:00-05:00
+  return `${fecha}T${hora}:00-05:00`;
 }
 
 export default function PagoMulta() {
@@ -49,6 +71,7 @@ export default function PagoMulta() {
   const subir = async () => {
     setMsg("");
 
+    // Validaciones
     if (!file) return setMsg("Selecciona un archivo primero.");
     if (!numeroOperacion.trim()) return setMsg("Falta Número de Operación.");
     if (!banco.trim()) return setMsg("Falta Banco o Entidad Financiera.");
@@ -62,17 +85,26 @@ export default function PagoMulta() {
     let receipt_path = null;
 
     try {
-      const { data: authData } = await supabase.auth.getUser();
+      // 🔎 Debug sesión (clave para el error RLS)
+      const { data: sess } = await supabase.auth.getSession();
+      console.log("SESSION?", !!sess?.session, sess?.session?.user?.id);
+
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (authErr) console.warn("getUser error:", authErr);
       const user = authData?.user;
+
+      console.log("USER?", user?.id, user?.email);
+
       if (!user) {
+        setMsg("No hay sesión activa. Vuelve a iniciar sesión.");
         window.location.href = "/login";
         return;
       }
 
+      // Trae perfil
       const { data: profile, error: pErr } = await supabase
         .from("profiles")
         .select("full_name, dni, equipo")
-
         .eq("id", user.id)
         .maybeSingle();
 
@@ -80,49 +112,68 @@ export default function PagoMulta() {
       if (!profile?.full_name) return setMsg("Tu perfil no tiene nombre.");
       if (!profile?.dni) return setMsg("Tu perfil no tiene DNI.");
 
-      const safeName = String(file.name || "archivo")
-        .replace(/\r?\n/g, "")
-        .replace(/[^\w.\-() ]+/g, "_")
-        .trim();
-
+      // Subir voucher
+      const safeName = sanitizeFileName(file.name);
       receipt_path = `${user.id}/${Date.now()}-${safeName}`;
 
-      const { error: upErr } = await supabase.storage.from(FINES_BUCKET).upload(receipt_path, file, { upsert: false });
+      const { error: upErr } = await supabase.storage
+        .from(FINES_BUCKET)
+        .upload(receipt_path, file, { upsert: false });
+
       if (upErr) throw upErr;
 
-      const operation_datetime = `${fecha}T${hora}:00`;
+      // Fechas/horas
+      const operation_datetime = buildPeruIso(fecha, hora); // timestamptz válido con -05:00
 
+      // Payload (NO inventamos columnas)
       const payload = {
         user_id: user.id,
         socio_name: profile.full_name,
-        equipo: profile.equipo || "",
-
         socio_email: user.email || "",
         socio_dni: profile.dni,
-        amount: FINE_AMOUNT,
+        equipo: profile.equipo || "",
 
+        amount: FINE_AMOUNT,
         operation_number: opNum,
         bank: banco.trim(),
+
         operation_datetime,
         operation_date: fecha,
-        operation_time: hora,
+        operation_time: `${hora}:00`, // la columna es time (sin tz) => HH:mm:ss
 
         receipt_path,
 
         admin_verification: "Pendiente",
         admin_observaciones: null,
-        
       };
 
-      const { error: insErr } = await supabase.from("training_fines").insert(payload);
+      console.log("INSERT payload:", payload);
+
+      // INSERT (forzamos retorno para detectar error real)
+      const { data: inserted, error: insErr } = await supabase
+        .from("training_fines")
+        .insert(payload)
+        .select("id")
+        .single();
+
       if (insErr) throw insErr;
+
+      console.log("Inserted fine:", inserted?.id);
 
       setMsg("✅ Multa registrada. Queda pendiente de validación.");
       reset();
     } catch (e) {
-      if (receipt_path) {
-        await supabase.storage.from(FINES_BUCKET).remove([receipt_path]);
+      console.error("PagoMulta error:", e);
+
+      // rollback: si subió voucher pero no insertó, borra archivo
+      try {
+        if (receipt_path) {
+          await supabase.storage.from(FINES_BUCKET).remove([receipt_path]);
+        }
+      } catch (rmErr) {
+        console.warn("No pude borrar voucher tras error:", rmErr);
       }
+
       setMsg("Error: " + (e?.message || String(e)));
     } finally {
       setLoading(false);
@@ -134,18 +185,27 @@ export default function PagoMulta() {
       <Card className="p-5">
         <h1 className="text-xl font-extrabold">Pago de multa por falta de entrenamiento</h1>
         <p className="mt-1 text-sm text-white/75">
-          Monto fijo: <b>S/ {FINE_AMOUNT}</b>. Plazo: <b>viernes 12:00:00 (mediodía)</b>.
+          Monto fijo: <b>S/ {FINE_AMOUNT}</b>. Plazo: <b>viernes 14:00:00 (2 pm)</b>.
         </p>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <label className="block">
             <Label>Número de Operación</Label>
-            <Input value={numeroOperacion} onChange={(e) => setNumeroOperacion(e.target.value)} placeholder="Ej: 123456" inputMode="numeric" />
+            <Input
+              value={numeroOperacion}
+              onChange={(e) => setNumeroOperacion(e.target.value)}
+              placeholder="Ej: 123456"
+              inputMode="numeric"
+            />
           </label>
 
           <label className="block">
             <Label>Banco o Entidad Financiera</Label>
-            <Input value={banco} onChange={(e) => setBanco(e.target.value)} placeholder="BCP / Interbank / Yape / Plin" />
+            <Input
+              value={banco}
+              onChange={(e) => setBanco(e.target.value)}
+              placeholder="BCP / Interbank / Yape / Plin"
+            />
           </label>
 
           <div className="grid grid-cols-2 gap-3 md:col-span-2">
