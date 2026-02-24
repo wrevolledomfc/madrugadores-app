@@ -10,16 +10,28 @@ import madrugadoresLogo from "../assets/madrugadores-logo.png";
 import superligaBanner from "../assets/superliga-banner-equipos.png";
 import SponsorCarousel from "../components/SponsorCarousel";
 
+/* ✅ ICONOS OFICIALES DE MARCA */
+import { FaWhatsapp, FaFacebookF, FaTiktok } from "react-icons/fa";
+
 const CLUB_URL = import.meta.env.VITE_CLUB_URL || "https://sites.google.com/view/mfc2026";
 
 // Sheets/Admin
 const SHEETS_WEBAPP_URL = import.meta.env.VITE_PAGOS_WEBAPP_URL; // /exec pagos
 const SHEET_URL = import.meta.env.VITE_PAGOS_SHEET_URL;
-const ASISTENCIAS_SHEET_URL = "https://docs.google.com/spreadsheets/d/1XxDB__Fh6MWHtT-VJG6KLoBBta948lAwz778mEmqR8M/edit?gid=812783321#gid=8127833210";
+const ASISTENCIAS_SHEET_URL =
+  "https://docs.google.com/spreadsheets/d/1XxDB__Fh6MWHtT-VJG6KLoBBta948lAwz778mEmqR8M/edit?gid=812783321#gid=8127833210";
 
 // Multas (admin)
 const MULTAS_WEBAPP_URL = import.meta.env.VITE_MULTAS_WEBAPP_URL; // /exec multas
 const MULTAS_SHEET_URL = import.meta.env.VITE_MULTAS_SHEET_URL;
+
+/* enlaces */
+const FACEBOOK_URL = "https://www.facebook.com/Madrugadoresfcoficial/";
+const TIKTOK_URL = "https://www.tiktok.com/@madrugadoresfc1?_r=1&_t=ZS-93Yl5P92Q2G";
+const WHATSAPP_URL = "https://wa.me/51949175139";
+
+/* Facebook plugin (iframe) */
+const FB_PAGE_HREF = "https://www.facebook.com/Madrugadoresfcoficial/";
 
 // ===== Helpers =====
 function formatPE(d) {
@@ -178,12 +190,7 @@ function BigAction({ to, href, external, title, subtitle, right }) {
 
   if (href) {
     return (
-      <a
-        href={href}
-        target={external ? "_blank" : undefined}
-        rel={external ? "noreferrer" : undefined}
-        className="block"
-      >
+      <a href={href} target={external ? "_blank" : undefined} rel={external ? "noreferrer" : undefined} className="block">
         {inner}
       </a>
     );
@@ -227,6 +234,27 @@ export default function Dashboard() {
 
   const [syncingFines, setSyncingFines] = useState(false);
   const [webappFinesOk, setWebappFinesOk] = useState(null);
+
+  // Facebook embed states
+  const [fbLoaded, setFbLoaded] = useState(false);
+  const [fbError, setFbError] = useState(false);
+
+  const FB_PLUGIN_SRC = useMemo(() => {
+    const width = 500;
+    const height = 650;
+
+    return (
+      "https://www.facebook.com/plugins/page.php" +
+      `?href=${encodeURIComponent(FB_PAGE_HREF)}` +
+      "&tabs=timeline" +
+      `&width=${width}` +
+      `&height=${height}` +
+      "&small_header=true" +
+      "&adapt_container_width=true" +
+      "&hide_cover=false" +
+      "&show_facepile=true"
+    );
+  }, []);
 
   // ✅ Regla: habilitado por entrenamiento con al menos 1 asistencia semanal
   const EXPECTED_WEEKLY = 1;
@@ -703,14 +731,14 @@ export default function Dashboard() {
   if (loading) return <LoadingScreen text="Cargando..." />;
 
   return (
-    <div className="min-h-screen text-white">
+    <div className="min-h-screen text-white relative pb-[760px]">
       {/* HEADER */}
       <header className="sticky top-0 z-20 border-b border-white/10 bg-black/30 backdrop-blur-md">
         <div className="mx-auto max-w-5xl px-4 py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-4 min-w-0 flex-1">
               <a
-                href="https://www.facebook.com/Madrugadoresfcoficial/"
+                href={FACEBOOK_URL}
                 target="_blank"
                 rel="noreferrer"
                 className="shrink-0"
@@ -761,6 +789,48 @@ export default function Dashboard() {
           </div>
         </div>
       </header>
+
+      {/* ===== REDES SOCIALES (ARRIBA DEL BANNER) ===== */}
+      <div className="mx-auto max-w-5xl px-4 pt-4">
+        <div className="mx-auto w-full max-w-3xl rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md p-4 shadow-[0_12px_35px_rgba(0,0,0,0.25)]">
+          <p className="text-center text-sm text-white/70 mb-3 font-semibold">Síguenos o contáctanos</p>
+
+          <div className="flex justify-center gap-7">
+            {/* WhatsApp */}
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noreferrer"
+              title="WhatsApp"
+              className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-emerald-500 grid place-items-center shadow-xl shadow-emerald-500/40 hover:scale-110 transition"
+            >
+              <FaWhatsapp size={30} />
+            </a>
+
+            {/* Facebook */}
+            <a
+              href={FACEBOOK_URL}
+              target="_blank"
+              rel="noreferrer"
+              title="Facebook"
+              className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-blue-600 grid place-items-center shadow-xl shadow-blue-500/40 hover:scale-110 transition"
+            >
+              <FaFacebookF size={28} />
+            </a>
+
+            {/* TikTok */}
+            <a
+              href={TIKTOK_URL}
+              target="_blank"
+              rel="noreferrer"
+              title="TikTok"
+              className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-black border border-white/20 grid place-items-center shadow-xl hover:scale-110 transition"
+            >
+              <FaTiktok size={28} />
+            </a>
+          </div>
+        </div>
+      </div>
 
       {/* Banner */}
       <div className="mx-auto max-w-5xl px-4 pt-4">
@@ -856,8 +926,7 @@ export default function Dashboard() {
                   </div>
 
                   <div className="text-xs text-white/70">
-                    Último pago validado:{" "}
-                    <span className="font-semibold text-white">{lastValidatedDate ? formatPE(lastValidatedDate) : "—"}</span>
+                    Último pago validado: <span className="font-semibold text-white">{lastValidatedDate ? formatPE(lastValidatedDate) : "—"}</span>
                   </div>
 
                   <div
@@ -908,10 +977,7 @@ export default function Dashboard() {
                   <div key={t.id} className="flex items-center justify-between py-3 gap-3">
                     <div>
                       <div className="text-sm font-semibold">
-                        {t.label} ·{" "}
-                        <span className="text-white/70">
-                          {t.training_date} {timeHHMM(t.start_time)}
-                        </span>
+                        {t.label} · <span className="text-white/70">{t.training_date} {timeHHMM(t.start_time)}</span>
                       </div>
                     </div>
 
@@ -968,7 +1034,7 @@ export default function Dashboard() {
               {entrenoRuleText}
             </div>
 
-            {/* ✅ LO QUE ME PEDISTE: CTA de multa SOLO si no asistió a ningún entrenamiento */}
+            {/* ✅ CTA de multa SOLO si no asistió */}
             {showFineCTA && (
               <div className="mt-4 space-y-3">
                 <Card className="p-4">
@@ -1039,6 +1105,85 @@ export default function Dashboard() {
           </Card>
         )}
       </main>
+
+      {/* ===== FACEBOOK PREVIEW (INFERIOR ABSOLUTA) ===== */}
+      <div className="absolute bottom-0 left-0 right-0 pb-6">
+        <div className="mx-auto max-w-5xl px-4">
+          <div className="mx-auto w-full max-w-3xl rounded-2xl border border-white/10 bg-black/60 backdrop-blur-md p-4 shadow-[0_12px_35px_rgba(0,0,0,0.55)]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-extrabold text-white">Facebook</div>
+                <div className="text-xs text-white/60">Últimas publicaciones</div>
+              </div>
+
+              <a
+                href={FACEBOOK_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-bold rounded-lg bg-blue-600 px-3 py-2 hover:brightness-110 transition"
+              >
+                Ver en Facebook
+              </a>
+            </div>
+
+            <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-black/80">
+              <div className="w-full flex justify-center relative min-h-[460px] py-3">
+                {/* Loader */}
+                {!fbLoaded && !fbError && (
+                  <div className="absolute inset-0 grid place-items-center">
+                    <div className="text-center">
+                      <div className="h-10 w-10 mx-auto rounded-full border-2 border-white/25 border-t-white animate-spin" />
+                      <p className="mt-3 text-xs text-white/60">Cargando Facebook…</p>
+                    </div>
+                  </div>
+                )}
+
+                <div
+                  className="relative origin-top w-[500px] max-w-full"
+                  style={{
+                    transform: "scale(clamp(0.72, (100vw - 60px)/500, 1))",
+                  }}
+                >
+                  <iframe
+                    title="Madrugadores FC Facebook"
+                    src={FB_PLUGIN_SRC}
+                    width="500"
+                    height="650"
+                    style={{ border: "none", overflow: "hidden", background: "black" }}
+                    scrolling="no"
+                    frameBorder="0"
+                    allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                    allowFullScreen
+                    onLoad={() => setFbLoaded(true)}
+                    onError={() => setFbError(true)}
+                    className="rounded-xl"
+                  />
+
+                  <div className="pointer-events-none absolute inset-0 bg-black/10 rounded-xl" />
+                </div>
+              </div>
+
+              {/* Fallback */}
+              {fbError && (
+                <div className="p-6 text-center border-t border-white/10">
+                  <p className="text-sm text-white/80 font-semibold">No se pudo cargar el preview de Facebook en este navegador.</p>
+                  <p className="text-xs text-white/60 mt-2">Abre la página directamente desde el botón.</p>
+
+                  <a
+                    href={FACEBOOK_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex mt-4 items-center gap-2 text-sm font-extrabold rounded-xl bg-blue-600 px-4 py-2 hover:brightness-110 transition"
+                  >
+                    <FaFacebookF />
+                    Abrir Facebook
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
