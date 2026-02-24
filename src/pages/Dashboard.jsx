@@ -791,45 +791,44 @@ export default function Dashboard() {
       </header>
 
       {/* ===== REDES SOCIALES (ARRIBA DEL BANNER) ===== */}
-      <div className="mx-auto max-w-5xl px-4 pt-4">
-        <div className="mx-auto w-full max-w-3xl rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md p-4 shadow-[0_12px_35px_rgba(0,0,0,0.25)]">
-          
-          <div className="flex justify-center gap-7">
-            {/* WhatsApp */}
-            <a
-              href={WHATSAPP_URL}
-              target="_blank"
-              rel="noreferrer"
-              title="WhatsApp"
-              className="h-7 w-7 sm:h-16 sm:w-8 rounded-2xl bg-emerald-500 grid place-items-center shadow-xl shadow-emerald-500/40 hover:scale-110 transition"
-            >
-              <FaWhatsapp size={15} />
-            </a>
+<div className="mx-auto max-w-5xl px-4 pt-3">
+  <div className="mx-auto w-full max-w-xl rounded-xl border border-white/15 bg-white/10 backdrop-blur-md p-2 shadow-[0_10px_25px_rgba(0,0,0,0.22)]">
+    <div className="flex justify-center gap-4">
+      {/* WhatsApp */}
+      <a
+        href={WHATSAPP_URL}
+        target="_blank"
+        rel="noreferrer"
+        title="WhatsApp"
+        className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-emerald-500 grid place-items-center shadow-lg shadow-emerald-500/30 hover:scale-110 transition"
+      >
+        <FaWhatsapp size={18} />
+      </a>
 
-            {/* Facebook */}
-            <a
-              href={FACEBOOK_URL}
-              target="_blank"
-              rel="noreferrer"
-              title="Facebook"
-              className="h-7 w-7 sm:h-16 sm:w-8 rounded-2xl bg-blue-500 grid place-items-center shadow-xl shadow-blue-500/40 hover:scale-110 transition"
-            >
-              <FaFacebookF size={15} />
-            </a>
+      {/* Facebook */}
+      <a
+        href={FACEBOOK_URL}
+        target="_blank"
+        rel="noreferrer"
+        title="Facebook"
+        className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-blue-600 grid place-items-center shadow-lg shadow-blue-500/30 hover:scale-110 transition"
+      >
+        <FaFacebookF size={17} />
+      </a>
 
-            {/* TikTok */}
-            <a
-              href={TIKTOK_URL}
-              target="_blank"
-              rel="noreferrer"
-              title="TikTok"
-              className="h-7 w-7 sm:h-16 sm:w-8 rounded-2xl bg-black border border-white/20 grid place-items-center shadow-xl hover:scale-110 transition"
-            >
-              <FaTiktok size={15} />
-            </a>
-          </div>
-        </div>
-      </div>
+      {/* TikTok */}
+      <a
+        href={TIKTOK_URL}
+        target="_blank"
+        rel="noreferrer"
+        title="TikTok"
+        className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-black border border-white/20 grid place-items-center shadow-lg hover:scale-110 transition"
+      >
+        <FaTiktok size={17} />
+      </a>
+    </div>
+  </div>
+</div>
 
       {/* Banner */}
       <div className="mx-auto max-w-5xl px-4 pt-4">
