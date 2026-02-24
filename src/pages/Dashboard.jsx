@@ -791,7 +791,7 @@ export default function Dashboard() {
       </header>
 
       {/* ===== REDES SOCIALES (ARRIBA DEL BANNER) ===== */}
-<div className="mx-auto max-w-5xl px-4 pt-3">
+<div className="mx-auto max-w-6xl px-4 pt-3">
   <div className="mx-auto w-full max-w-xl rounded-xl border border-white/15 bg-white/10 backdrop-blur-md p-2 shadow-[0_10px_25px_rgba(0,0,0,0.22)]">
     <div className="flex justify-center gap-4">
       {/* WhatsApp */}
@@ -999,6 +999,10 @@ export default function Dashboard() {
         {/* ESTADOS DE CUENTA CLUB 2026 */}
         <div className="grid gap-4 sm:grid-cols-1">
           <BigAction to="/estados-cuenta" title="Estados de cuenta del Club 2026" subtitle="Revisa el estado de cuenta mensual (Sheets)." />
+        </div>
+{/* FOTOS DE LOS PARTIDOS 2026 */}
+        <div className="grid gap-4 sm:grid-cols-1">
+          <BigAction to="/fotografias" title="Ver Fotos de la Fecha" subtitle="Revisa las fotografías de los partidos" />
         </div>
 
         {/* HABILITADO POR ENTRENAMIENTO */}
