@@ -9,6 +9,8 @@ import { cn } from "../lib/cn";
 import madrugadoresLogo from "../assets/madrugadores-logo.png";
 import superligaBanner from "../assets/superliga-banner-equipos.png";
 import SponsorCarousel from "../components/SponsorCarousel";
+import Fotografias from "./pages/Fotografias";
+
 
 /* ✅ ICONOS OFICIALES DE MARCA */
 import { FaWhatsapp, FaFacebookF, FaTiktok } from "react-icons/fa";
@@ -1002,7 +1004,7 @@ export default function Dashboard() {
         </div>
 {/* FOTOS DE LOS PARTIDOS 2026 */}
         <div className="grid gap-4 sm:grid-cols-1">
-          <BigAction to="/fotografias" title="Ver Fotos de la Fecha" subtitle="Revisa las fotografías de los partidos" />
+          <BigAction to="/Fotografias" title="Ver Fotos de la Fecha" subtitle="Revisa las fotografías de los partidos" />
         </div>
 
         {/* HABILITADO POR ENTRENAMIENTO */}
