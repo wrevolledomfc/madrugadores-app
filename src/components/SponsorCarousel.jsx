@@ -18,7 +18,7 @@ export default function SponsorCarousel({
     () => [
       { src: sponsor1, alt: "CR Consult", href: "https://crconsult.pe" },
       { src: sponsor2, alt: "Fundo Onírica", href: "https://www.instagram.com/fundo_onirica/?hl=es" },
-      { src: sponsor3, alt: "Flores Abogados Whatsapp", href: "https://wa.me/51987278281?text=Hola%20Flores%20Abogados,%20vengo%20de%20Madrugadores%20FC"},
+      { src: sponsor3, alt: "Flores García Abogados Whatsapp", href: "https://wa.me/51987278281?text=Hola%20Flores%20García%20Abogados,%20vengo%20de%20Madrugadores%20FC"},
     ],
     []
   );
