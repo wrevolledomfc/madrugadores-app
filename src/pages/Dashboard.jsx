@@ -902,9 +902,12 @@ export default function Dashboard() {
         </div>
 
         {/* ✅ FOTOS DE LOS PARTIDOS 2026 (FIX) */}
-        <div className="grid gap-4 sm:grid-cols-1">
-          <BigAction to="/fotografias" title="Ver Fotos de la Fecha" subtitle="Revisa las fotografías de los partidos" />
-        </div>
+     
+          <BigAction
+  to="/fotografias"
+  title="Ver Fotos de la Fecha"
+  subtitle="Revisa las fotografias de los partidos"
+/>
 
         {/* ... EL RESTO DE TU DASHBOARD SIGUE IGUAL ... */}
       </main>
