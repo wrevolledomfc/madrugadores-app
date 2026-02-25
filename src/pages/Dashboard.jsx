@@ -570,24 +570,16 @@ export default function Dashboard() {
 
         channelPays = supabase
           .channel(`payments_socio_${user.id}`)
-          .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "payments", filter: `user_id=eq.${user.id}` },
-            async () => {
-              await loadSocioSums(user.id);
-            }
-          )
+          .on("postgres_changes", { event: "*", schema: "public", table: "payments", filter: `user_id=eq.${user.id}` }, async () => {
+            await loadSocioSums(user.id);
+          })
           .subscribe();
 
         channelFines = supabase
           .channel(`fines_socio_${user.id}`)
-          .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "training_fines", filter: `user_id=eq.${user.id}` },
-            async () => {
-              await loadSocioFinesThisWeek(user.id);
-            }
-          )
+          .on("postgres_changes", { event: "*", schema: "public", table: "training_fines", filter: `user_id=eq.${user.id}` }, async () => {
+            await loadSocioFinesThisWeek(user.id);
+          })
           .subscribe();
       }
 
@@ -847,11 +839,7 @@ export default function Dashboard() {
       <div className="mx-auto max-w-5xl px-4 pt-4">
         <div className="overflow-hidden rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md shadow-[0_12px_35px_rgba(0,0,0,0.25)]">
           <a href={CLUB_URL} target="_blank" rel="noreferrer" className="block" title="Ver datos del campeonato">
-            <img
-              src={superligaBanner}
-              alt="Superliga Argentina 2026"
-              className="w-full object-cover transition hover:scale-[1.01]"
-            />
+            <img src={superligaBanner} alt="Superliga Argentina 2026" className="w-full object-cover transition hover:scale-[1.01]" />
           </a>
         </div>
       </div>
@@ -859,20 +847,18 @@ export default function Dashboard() {
       {/* Carrusel */}
       <div className="mx-auto max-w-5xl px-4 pt-3">
         <div className="mx-auto w-full max-w-5xl">
-          <SponsorCarousel
-            showTitle={false}
-            slidePaddingClassName="py-2 px-4"
-            imageClassName="max-h-20 sm:max-h-24 md:max-h-24 object-contain"
-          />
+          <SponsorCarousel showTitle={false} slidePaddingClassName="py-2 px-4" imageClassName="max-h-20 sm:max-h-24 md:max-h-24 object-contain" />
         </div>
       </div>
 
       <main className="mx-auto max-w-5xl px-4 py-6 space-y-4">
+        {/* QR y FOTO */}
         <div className="grid gap-4 sm:grid-cols-2">
           <BigAction to="/mi-qr" title="Mi Carnet / QR" subtitle="Muestra tu QR al administrador o negocio." />
           <BigAction to="/mi-foto" title="Mi Foto" subtitle="Sube tu foto (máx 1MB)." />
         </div>
 
+        {/* PAGO DEL MES */}
         {rol === "SOCIO" && (
           <div className="grid gap-4 sm:grid-cols-1">
             <BigAction
@@ -896,26 +882,317 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* ESTADO DE PAGOS */}
+        {rol === "SOCIO" && (
+          <Card className="p-5">
+            <div className="text-sm font-extrabold">Estado de Pagos</div>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <Card className="p-4">
+                <div className="text-sm font-extrabold">¿Estás al día en tus pagos?</div>
+                <div className="mt-1 text-xs text-white/70">
+                  Al {now.toISOString().slice(0, 10)} debes tener{" "}
+                  <span className="font-bold text-white">{moneyPE(requiredDue)}</span> en pagos <b>validados</b>.
+                </div>
+
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <div className="text-sm">
+                    Validados: <span className="font-extrabold">{moneyPE(sumValidated)}</span>
+                  </div>
+
+                  <div
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs font-extrabold",
+                      isAlDia ? "bg-emerald-500/15 border-emerald-300/30 text-emerald-50" : "bg-red-500/15 border-red-300/30 text-red-100"
+                    )}
+                  >
+                    {isAlDia ? "✅ SÍ" : "⛔ NO"}
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="p-4">
+                <div className="text-sm font-extrabold">¿Habilitado por pago para jugar?</div>
+
+                <div className="mt-2 text-xs text-white/70">
+                  Regla: hasta el <b>05 (23:59:59)</b> se exige estar al día con <b>100 × (mes-1)</b>. Desde el{" "}
+                  <b>06 (00:00:00)</b> se exige <b>100 × mes</b>. Si pagas después del 05: del <b>06 al 10</b> no juegas la fecha
+                  siguiente; desde el <b>11</b> no juegas todo el mes.
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  <div className="text-xs text-white/70">
+                    Corte 05: <span className="font-semibold text-white">{formatPE(c5)}</span>
+                  </div>
+                  <div className="text-xs text-white/70">
+                    Corte 10: <span className="font-semibold text-white">{formatPE(c10)}</span>
+                  </div>
+
+                  <div className="text-xs text-white/70">
+                    Último pago validado:{" "}
+                    <span className="font-semibold text-white">{lastValidatedDate ? formatPE(lastValidatedDate) : "—"}</span>
+                  </div>
+
+                  <div
+                    className={cn(
+                      "rounded-xl border px-3 py-2 text-xs font-semibold whitespace-pre-line",
+                      isHabilitadoPago ? "bg-emerald-500/15 border-emerald-300/30 text-emerald-50" : "bg-red-500/15 border-red-300/30 text-red-100"
+                    )}
+                  >
+                    {paymentRuleText}
+                  </div>
+                </div>
+              </Card>
+            </div>
+          </Card>
+        )}
+
+        {/* DATOS DEL TORNEO */}
+        <div className="grid gap-4 sm:grid-cols-1">
+          <BigAction href={CLUB_URL} external title="Datos del Torneo" subtitle="Tabla, posiciones, fixtures y estado del campeonato." />
+        </div>
+
+        {/* ASISTENCIA SEMANAL */}
+        {rol === "SOCIO" && weekText && (
+          <Card className="p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-extrabold">Asistencia semanal</div>
+                <div className="mt-1 text-sm text-white/75">{weekText}</div>
+
+                <div className="mt-2 text-xs text-white/80">
+                  <div>{attendedWeekText}</div>
+                  {opportunitiesText ? <div>{opportunitiesText}</div> : null}
+                </div>
+              </div>
+
+              <Link
+                to="/asistencias"
+                className="inline-flex items-center rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-extrabold hover:bg-white/15 transition text-white"
+              >
+                Ver entrenamientos del año
+              </Link>
+            </div>
+
+            <div className="mt-3 divide-y divide-white/10">
+              {weekTrainings.map((t) => {
+                const ok = attendanceMap.has(t.id);
+                return (
+                  <div key={t.id} className="flex items-center justify-between py-3 gap-3">
+                    <div>
+                      <div className="text-sm font-semibold">
+                        {t.label} · <span className="text-white/70">{t.training_date} {timeHHMM(t.start_time)}</span>
+                      </div>
+                    </div>
+
+                    <div
+                      className={cn(
+                        "rounded-full border px-3 py-1 text-xs font-extrabold",
+                        ok ? "bg-emerald-500/15 border-emerald-300/30 text-emerald-50" : "bg-white/10 border-white/15 text-white/80"
+                      )}
+                    >
+                      {ok ? "✅ Asistió" : "⛔ No asistió"}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {weekTrainings.length === 0 && <div className="py-3 text-sm text-white/70">Aún no hay entrenamientos cargados esta semana.</div>}
+            </div>
+          </Card>
+        )}
+
         {/* ESTADOS DE CUENTA CLUB 2026 */}
         <div className="grid gap-4 sm:grid-cols-1">
           <BigAction to="/estados-cuenta" title="Estados de cuenta del Club 2026" subtitle="Revisa el estado de cuenta mensual (Sheets)." />
         </div>
 
-        {/* ✅ FOTOS DE LOS PARTIDOS 2026 (FIX) */}
-     
-          <BigAction
-  to="/fotografias"
-  title="Ver Fotos de la Fecha"
-  subtitle="Revisa las fotografias de los partidos"
-/>
+        {/* ✅ FOTOS DE LOS PARTIDOS 2026 */}
+        <div className="grid gap-4 sm:grid-cols-1">
+          <BigAction to="/fotografias" title="Ver Fotos de la Fecha" subtitle="Revisa las fotografías de los partidos" />
+        </div>
 
-        {/* ... EL RESTO DE TU DASHBOARD SIGUE IGUAL ... */}
+        {/* HABILITADO POR ENTRENAMIENTO */}
+        {rol === "SOCIO" && (
+          <Card className="p-5">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <div className="text-sm font-extrabold">Habilitado por entrenamiento</div>
+                <div className="mt-1 text-xs text-white/70">
+                  Asistencias esta semana: <b>{attendedCount}</b> / <b>{totalThisWeek}</b>.
+                  {showFineCTA ? " Si no entrenas, multa S/100 hasta viernes 12:00:00." : ""}
+                </div>
+              </div>
+
+              <div
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs font-extrabold",
+                  habilitadoEntreno ? "bg-emerald-500/15 border-emerald-300/30 text-emerald-50" : "bg-red-500/15 border-red-300/30 text-red-100"
+                )}
+              >
+                {habilitadoEntreno ? "✅ SÍ" : "⛔ NO"}
+              </div>
+            </div>
+
+            <div
+              className={cn(
+                "mt-3 rounded-xl border px-3 py-2 text-xs font-semibold",
+                habilitadoEntreno ? "bg-emerald-500/10 border-emerald-300/20 text-emerald-50" : "bg-red-500/10 border-red-300/20 text-red-100"
+              )}
+            >
+              {entrenoRuleText}
+            </div>
+
+            {/* ✅ CTA de multa SOLO si no asistió */}
+            {showFineCTA && (
+              <div className="mt-4 space-y-3">
+                <Card className="p-4">
+                  <div className="text-sm font-extrabold">Paga tu multa para habilitarte</div>
+                  <div className="mt-1 text-xs text-white/70">
+                    No registras asistencia esta semana. Para habilitarte debes pagar <b>S/100</b> (plazo: <b>viernes 12:00:00</b>).
+                  </div>
+                </Card>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <BigAction
+                    to="/multa"
+                    title="Registrar pago de multa por entrenamiento"
+                    subtitle="Sube tu voucher (S/100). Plazo: viernes 12:00:00."
+                    right={finePendingThisWeek ? "Tienes una multa pendiente" : ""}
+                  />
+                  <BigAction to="/mis-multas" title="Ver mis multas" subtitle="Historial y estado (pendiente/validado/observado)." />
+                </div>
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* ADMIN */}
+        {rol === "ADMIN" && (
+          <Card className="p-5">
+            <div className="grid gap-3 sm:grid-cols-1 mb-4">
+              <BigAction
+                to="/admin-scan"
+                title="Escanear QR (Administrador)"
+                subtitle="Registrar asistencia a entrenamientos escaneando el carnet/QR del socio."
+              />
+            </div>
+
+            <div className="text-sm font-extrabold">Panel Admin</div>
+
+            <div className="mt-3 flex flex-wrap gap-2 items-center">
+              <SoftLink href={SHEET_URL} target="_blank" rel="noreferrer">
+                Abrir Validación de Pagos (Sheet)
+              </SoftLink>
+
+              <SoftLink href={ASISTENCIAS_SHEET_URL} target="_blank" rel="noreferrer">
+                Abrir Asistencias (Sheet)
+              </SoftLink>
+
+              <SoftButton onClick={syncValidatedPaymentsToSupabase} disabled={syncingPayments}>
+                {syncingPayments ? "Sincronizando..." : "Sync pagos validados → Supabase"}
+              </SoftButton>
+
+              <span className="text-xs text-white/70">WebApp pagos: {webappOk === null ? "—" : webappOk ? "OK" : "ERROR"}</span>
+            </div>
+
+            <div className="mt-4 border-t border-white/10 pt-4">
+              <div className="text-sm font-extrabold">Validación de multas por entrenamiento</div>
+
+              <div className="mt-3 flex flex-wrap gap-2 items-center">
+                <SoftLink href={MULTAS_SHEET_URL} target="_blank" rel="noreferrer">
+                  Abrir Multas (Sheet)
+                </SoftLink>
+
+                <SoftButton onClick={syncValidatedFinesToSupabase} disabled={syncingFines}>
+                  {syncingFines ? "Sincronizando..." : "Sync multas validadas → Supabase"}
+                </SoftButton>
+
+                <span className="text-xs text-white/70">WebApp multas: {webappFinesOk === null ? "—" : webappFinesOk ? "OK" : "ERROR"}</span>
+              </div>
+            </div>
+          </Card>
+        )}
       </main>
 
-      {/* NOTA:
-        Tu archivo original sigue con muchísimo contenido abajo (estado pagos, asistencia, admin, facebook).
-        No lo recorté en tu versión real: copia y pega TODO tu Dashboard y solo cambia esa línea del link.
-      */}
+      {/* ===== FACEBOOK PREVIEW (INFERIOR ABSOLUTA) ===== */}
+      <div className="absolute bottom-0 left-0 right-0 pb-6">
+        <div className="mx-auto max-w-5xl px-4">
+          <div className="mx-auto w-full max-w-3xl rounded-2xl border border-white/10 bg-black/60 backdrop-blur-md p-4 shadow-[0_12px_35px_rgba(0,0,0,0.55)]">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-extrabold text-white">Facebook</div>
+                <div className="text-xs text-white/60">Últimas publicaciones</div>
+              </div>
+
+              <a
+                href={FACEBOOK_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-bold rounded-lg bg-blue-600 px-3 py-2 hover:brightness-110 transition"
+              >
+                Ver en Facebook
+              </a>
+            </div>
+
+            <div className="mt-3 overflow-hidden rounded-xl border border-white/10 bg-black/80">
+              <div className="w-full flex justify-center relative min-h-[460px] py-3">
+                {/* Loader */}
+                {!fbLoaded && !fbError && (
+                  <div className="absolute inset-0 grid place-items-center">
+                    <div className="text-center">
+                      <div className="h-10 w-10 mx-auto rounded-full border-2 border-white/25 border-t-white animate-spin" />
+                      <p className="mt-3 text-xs text-white/60">Cargando Facebook…</p>
+                    </div>
+                  </div>
+                )}
+
+                <div
+                  className="relative origin-top w-[500px] max-w-full"
+                  style={{
+                    transform: "scale(clamp(0.72, (100vw - 60px)/500, 1))",
+                  }}
+                >
+                  <iframe
+                    title="Madrugadores FC Facebook"
+                    src={FB_PLUGIN_SRC}
+                    width="500"
+                    height="650"
+                    style={{ border: "none", overflow: "hidden", background: "black" }}
+                    scrolling="no"
+                    frameBorder="0"
+                    allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                    allowFullScreen
+                    onLoad={() => setFbLoaded(true)}
+                    onError={() => setFbError(true)}
+                    className="rounded-xl"
+                  />
+
+                  <div className="pointer-events-none absolute inset-0 bg-black/10 rounded-xl" />
+                </div>
+              </div>
+
+              {/* Fallback */}
+              {fbError && (
+                <div className="p-6 text-center border-t border-white/10">
+                  <p className="text-sm text-white/80 font-semibold">No se pudo cargar el preview de Facebook en este navegador.</p>
+                  <p className="text-xs text-white/60 mt-2">Abre la página directamente desde el botón.</p>
+
+                  <a
+                    href={FACEBOOK_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex mt-4 items-center gap-2 text-sm font-extrabold rounded-xl bg-blue-600 px-4 py-2 hover:brightness-110 transition"
+                  >
+                    <FaFacebookF />
+                    Abrir Facebook
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
