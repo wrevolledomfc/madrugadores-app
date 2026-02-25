@@ -20,7 +20,7 @@ import MisPagos from "./pages/MisPagos.jsx";
 import PagoMulta from "./pages/PagoMulta.jsx";
 import MisMultas from "./pages/MisMultas.jsx";
 import EstadosCuenta from "./pages/EstadosCuenta.jsx";
-import Fotografias from "./pages/fotografias.jsx";
+import fotografias from "./pages/fotografias.jsx";
 
 export default function App() {
   return (
