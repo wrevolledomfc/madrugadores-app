@@ -9,6 +9,7 @@ import { cn } from "../lib/cn";
 import madrugadoresLogo from "../assets/madrugadores-logo.png";
 import superligaBanner from "../assets/superliga-banner-equipos.png";
 import SponsorCarousel from "../components/SponsorCarousel";
+import jugadores from "../assets/jugadores.png";
 
 /* ✅ ICONOS OFICIALES DE MARCA */
 import { FaWhatsapp, FaFacebookF, FaTiktok } from "react-icons/fa";
