@@ -839,7 +839,7 @@ export default function Dashboard() {
       <div className="mx-auto max-w-5xl px-4 pt-4">
         <div className="overflow-hidden rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md shadow-[0_12px_35px_rgba(0,0,0,0.25)]">
           <a href={CLUB_URL} target="_blank" rel="noreferrer" className="block" title="Ver datos del campeonato">
-            <img src={superligaBanner} alt="Superliga Argentina 2026" className="w-full object-cover transition hover:scale-[1.01]" />
+            <img src={jugadores} alt="Superliga Argentina 2026" className="w-full object-cover transition hover:scale-[1.01]" />
           </a>
         </div>
       </div>
