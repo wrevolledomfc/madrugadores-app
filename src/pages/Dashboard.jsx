@@ -9,7 +9,6 @@ import { cn } from "../lib/cn";
 import madrugadoresLogo from "../assets/madrugadores-logo.png";
 import superligaBanner from "../assets/superliga-banner-equipos.png";
 import SponsorCarousel from "../components/SponsorCarousel";
-import jugadores from "../assets/jugadores.png";
 
 /* ✅ ICONOS OFICIALES DE MARCA */
 import { FaWhatsapp, FaFacebookF, FaTiktok } from "react-icons/fa";
@@ -841,7 +840,7 @@ export default function Dashboard() {
         <div className="overflow-hidden rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md shadow-[0_12px_35px_rgba(0,0,0,0.25)]">
           <a href={CLUB_URL} target="_blank" rel="noreferrer" className="block" title="Ver datos del campeonato">
             <img
-  src={jugadores}
+  src={superliga-banner-equipos}
   alt="Superliga Argentina 2026"
   className="w-full h-32 sm:h-40 md:h-48 object-cover transition hover:scale-[1.01]"
 />
