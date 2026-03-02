@@ -843,7 +843,7 @@ export default function Dashboard() {
             <img
   src={jugadoresBanner}
   alt="Superliga Argentina 2026"
-  className="w-full h-28 sm:h-32 md:h-40 object-cover object-top transition hover:scale-[1.01]"
+  className="w-full h-56 sm:h-64 md:h-80 object-cover object-top transition hover:scale-[1.01]"
 />
 
           </a>
