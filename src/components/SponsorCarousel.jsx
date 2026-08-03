@@ -17,7 +17,7 @@ export default function SponsorCarousel({
   const slides = useMemo(
     () => [
       { src: sponsor1, alt: "CR Consult", href: "https://crconsult.pe" },
-      { src: sponsor2, alt: "Fundo Onírica", href: "https://www.instagram.com/fundo_onirica/?hl=es" },
+      { src: sponsor2, alt: "Vimalu Hacienda", href: "https://www.instagram.com/vimaluhacienda?igsh=MWZmNmJ2Y2J3eXo1YQ==" },
       { src: sponsor3, alt: "Flores García Abogados Whatsapp", href: "https://wa.me/51987278281?text=Hola%20Flores%20García%20Abogados,%20vengo%20de%20Madrugadores%20FC"},
     ],
     []

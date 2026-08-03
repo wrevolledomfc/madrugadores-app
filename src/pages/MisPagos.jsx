@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { cn } from "../lib/cn";
-
+import AppHeader from "../components/AppHeader";
 const RECEIPTS_BUCKET = import.meta.env.VITE_RECEIPTS_BUCKET || "Recibos";
 const PAY_YEAR = 2026;
 const MONTHLY_FEE = 100;

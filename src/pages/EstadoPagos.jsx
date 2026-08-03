@@ -4,7 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import LoadingScreen from "../components/LoadingScreen";
 import { supabase } from "../lib/supabase";
 import { cn } from "../lib/cn";
-
+import AppHeader from "../components/AppHeader";
 const RECEIPTS_BUCKET = import.meta.env.VITE_RECEIPTS_BUCKET || "Recibos";
 
 function qsYear(search) {

@@ -80,7 +80,7 @@ export default function Login() {
         {/* ===== Banner clickeable ===== */}
         <div className="mx-auto w-full max-w-3xl overflow-hidden rounded-2xl border border-white/15 bg-white/10 backdrop-blur-md shadow-[0_12px_35px_rgba(0,0,0,0.35)]">
           <a
-            href="https://sites.google.com/view/mfc2026"
+            href="https://mfc-estadisticas.pages.dev"
             target="_blank"
             rel="noreferrer"
             title="Ver datos del campeonato"

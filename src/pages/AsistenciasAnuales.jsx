@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-
+import AppHeader from "../components/AppHeader";
 /**
  * Convierte timestamptz/ISO a "YYYY-MM-DD HH:MM" en hora Perú (America/Lima).
  * No hace "slice" (eso NO convierte zona horaria).

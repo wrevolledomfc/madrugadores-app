@@ -5,7 +5,7 @@ import { QRCodeCanvas } from "qrcode.react";
 
 import madrugadoresLogo from "../assets/madrugadores-logo.png";
 import SponsorCarousel from "../components/SponsorCarousel";
-
+import AppHeader from "../components/AppHeader";
 // ✅ Fondo como AppLayout
 import bg1 from "../assets/background-1.png";
 import bg2 from "../assets/background-2.png";

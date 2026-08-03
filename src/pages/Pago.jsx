@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import { cn } from "../lib/cn";
-
+import AppHeader from "../components/AppHeader";
 import qrPago from "../assets/qr-de-pago.png";
 import cuentas from "../assets/cuentas-mfc.png";
 import AssetImage from "../components/AssetImage.jsx";
